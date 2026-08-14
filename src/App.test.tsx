@@ -1,17 +1,67 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App from './App'
+import App, { seedApplicants } from './App'
+
+let apiApplicants = structuredClone(seedApplicants)
+
+function jsonResponse(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
 
 beforeEach(() => {
   window.history.pushState({}, '', '/')
-  const store = new Map<string, string>()
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => store.set(key, value),
-    removeItem: (key: string) => store.delete(key),
-    clear: () => store.clear(),
-  })
+  apiApplicants = structuredClone(seedApplicants)
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url
+    const method = init?.method ?? 'GET'
+    if (url === '/api/applicants' && method === 'GET') {
+      return jsonResponse({ applicants: apiApplicants })
+    }
+    if (url === '/api/applicants' && method === 'POST') {
+      const body = JSON.parse(String(init?.body))
+      const existing = apiApplicants.find((applicant) => applicant.nationalId === body.nationalId)
+      if (existing) return jsonResponse({ applicant: existing, duplicate: true })
+      const applicant = {
+        id: `test-${body.nationalId}`,
+        nationalId: body.nationalId,
+        requestNo: `REQ-2026-${String(apiApplicants.length + 1).padStart(4, '0')}`,
+        name: body.name,
+        phone: body.phone,
+        qualification: body.qualification,
+        gpa: Number(body.gpa),
+        source: 'direct' as const,
+        status: 'بانتظار مراجعة شؤون المتدربين' as const,
+        documents: [
+          { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' as const },
+          { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' as const },
+          { name: 'نموذج الإقرار', status: 'معتمد' as const },
+        ],
+        scores: { technical: 0, communication: 0, motivation: 0 },
+        notes: '',
+        audit: ['إنشاء طلب جديد وتأكيد الإقرار'],
+      }
+      apiApplicants = [applicant, ...apiApplicants]
+      return jsonResponse({ applicant }, 201)
+    }
+    const match = String(url).match(/^\/api\/applicants\/([^/]+)$/)
+    if (match && method === 'PATCH') {
+      const body = JSON.parse(String(init?.body))
+      let updated = apiApplicants.find((applicant) => applicant.id === match[1])
+      if (!updated) return jsonResponse({ error: 'not found' }, 404)
+      updated = { ...updated, ...body.patch, audit: [body.audit, ...updated.audit].slice(0, 8) }
+      apiApplicants = apiApplicants.map((applicant) => applicant.id === updated?.id ? updated : applicant)
+      return jsonResponse({ applicant: updated })
+    }
+    if (url === '/api/reset' && method === 'POST') {
+      apiApplicants = structuredClone(seedApplicants)
+      return jsonResponse({ applicants: apiApplicants })
+    }
+    return jsonResponse({ error: 'not found' }, 404)
+  }))
 })
 
 afterEach(() => {
@@ -42,7 +92,7 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('المعدل'), '96')
     await user.click(screen.getByRole('button', { name: /رفع الوثائق/ }))
 
-    expect(screen.getByText('مازن صالح القحطاني')).toBeTruthy()
+    expect(await screen.findByText('مازن صالح القحطاني')).toBeTruthy()
     expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
     expect(screen.getByText('بانتظار مراجعة شؤون المتدربين')).toBeTruthy()
   })
@@ -54,6 +104,38 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
     expect(screen.getByLabelText('رقم الهوية الوطنية')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'شؤون المتدربين' })).toBeNull()
+  })
+
+  it('persists applicant portal registration into the internal pages', async () => {
+    const user = userEvent.setup()
+    window.history.pushState({}, '', '/?view=applicant')
+    const { unmount } = render(<App />)
+
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية'), '1088888888')
+    await user.type(screen.getByLabelText('الاسم الكامل'), 'تركي ناصر الحربي')
+    await user.type(screen.getByLabelText('رقم الجوال'), '0551112222')
+    await user.type(screen.getByLabelText('المؤهل'), 'ثانوية عامة')
+    await user.clear(screen.getByLabelText('المعدل'))
+    await user.type(screen.getByLabelText('المعدل'), '94')
+    await user.click(screen.getByRole('button', { name: /رفع الوثائق/ }))
+
+    expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
+    expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
+    expect(screen.getByText('بانتظار مراجعة شؤون المتدربين')).toBeTruthy()
+
+    unmount()
+    window.history.pushState({}, '', '/')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'شؤون المتدربين' })).toBeTruthy()
+    expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
+    expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
+    expect(screen.getByText('تركي ناصر الحربي')).toBeTruthy()
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
+    expect(screen.getByText('تركي ناصر الحربي')).toBeTruthy()
   })
 
   it('prevents duplicate applicant registration by national ID', async () => {

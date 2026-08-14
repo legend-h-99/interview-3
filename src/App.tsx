@@ -17,7 +17,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 type Role = 'college' | 'trainees' | 'head' | 'committee' | 'applicant'
@@ -79,7 +79,7 @@ const committees: Committee[] = [
   { id: 'c3', name: 'لجنة الوثائق والدعم', room: 'مكتب القبول', members: ['أ. ريم القحطاني', 'أ. محمد الغامدي'] },
 ]
 
-const seedApplicants: Applicant[] = [
+export const seedApplicants: Applicant[] = [
   {
     id: 'a1',
     nationalId: '1012345678',
@@ -152,15 +152,10 @@ const questions = [
   'كيف تتعامل مع ضغط الدراسة والعمل ضمن فريق؟',
 ]
 
-const loadApplicants = () => {
-  const saved = localStorage.getItem('interview-applicants')
-  return saved ? (JSON.parse(saved) as Applicant[]) : seedApplicants
-}
-
 function App() {
   const applicantOnly = new URLSearchParams(window.location.search).get('view') === 'applicant'
   const [role, setRole] = useState<Role>(applicantOnly ? 'applicant' : 'trainees')
-  const [applicants, setApplicants] = useState<Applicant[]>(loadApplicants)
+  const [applicants, setApplicants] = useState<Applicant[]>(seedApplicants)
   const [selectedId, setSelectedId] = useState(seedApplicants[0].id)
   const [nationalId, setNationalId] = useState('')
   const [form, setForm] = useState({
@@ -170,7 +165,7 @@ function App() {
     gpa: '90',
   })
 
-  const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0]
+  const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
   const stats = useMemo(() => {
     const approved = applicants.filter((item) => item.status === 'النتيجة معتمدة').length
     const pendingDocs = applicants.filter((item) => item.status.includes('مراجعة') || item.status.includes('استكمال')).length
@@ -178,24 +173,39 @@ function App() {
     return { total: applicants.length, approved, pendingDocs, interviewed }
   }, [applicants])
 
-  const saveApplicants = (next: Applicant[]) => {
-    setApplicants(next)
-    localStorage.setItem('interview-applicants', JSON.stringify(next))
+  const refreshApplicants = async () => {
+    const response = await fetch('/api/applicants')
+    if (!response.ok) throw new Error('Unable to load applicants')
+    const data = (await response.json()) as { applicants: Applicant[] }
+    setApplicants(data.applicants)
+    setSelectedId((current) => data.applicants.some((applicant) => applicant.id === current) ? current : data.applicants[0]?.id ?? seedApplicants[0].id)
   }
 
-  const updateApplicant = (id: string, patch: Partial<Applicant>, audit: string) => {
-    saveApplicants(
-      applicants.map((applicant) =>
-        applicant.id === id
-          ? { ...applicant, ...patch, audit: [audit, ...applicant.audit].slice(0, 8) }
-          : applicant,
-      ),
+  useEffect(() => {
+    refreshApplicants().catch(() => setApplicants(seedApplicants))
+  }, [])
+
+  const updateApplicant = async (id: string, patch: Partial<Applicant>, audit: string) => {
+    const next = applicants.map((applicant) =>
+      applicant.id === id
+        ? { ...applicant, ...patch, audit: [audit, ...applicant.audit].slice(0, 8) }
+        : applicant,
     )
+    setApplicants(next)
+    const response = await fetch(`/api/applicants/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ patch, audit }),
+    })
+    if (response.ok) {
+      const data = (await response.json()) as { applicant: Applicant }
+      setApplicants((current) => current.map((applicant) => applicant.id === id ? data.applicant : applicant))
+    }
   }
 
-  const approveDocuments = (id: string) => {
+  const approveDocuments = async (id: string) => {
     const nextWaitingNo = `W-${String(applicants.filter((item) => item.waitingNo).length + 15).padStart(3, '0')}`
-    updateApplicant(
+    await updateApplicant(
       id,
       {
         status: 'تم إصدار رقم الانتظار',
@@ -206,56 +216,44 @@ function App() {
     )
   }
 
-  const assignCommittee = (id: string, committeeId: string) => {
-    updateApplicant(
+  const assignCommittee = async (id: string, committeeId: string) => {
+    await updateApplicant(
       id,
       { committeeId, interviewAt: '2026-08-18 11:00', status: 'بانتظار المقابلة' },
       'توزيع المتقدم على لجنة وموعد مقابلة',
     )
   }
 
-  const submitEvaluation = (id: string) => {
-    updateApplicant(id, { status: 'بانتظار اعتماد رئيس القسم', finalResult: calculateScore(selected) >= 75 ? 'مقبول' : 'احتياط' }, 'اعتماد تقييم اللجنة')
+  const submitEvaluation = async (id: string) => {
+    await updateApplicant(id, { status: 'بانتظار اعتماد رئيس القسم', finalResult: calculateScore(selected) >= 75 ? 'مقبول' : 'احتياط' }, 'اعتماد تقييم اللجنة')
   }
 
-  const approveResult = (id: string) => {
-    updateApplicant(id, { status: 'النتيجة معتمدة' }, 'اعتماد النتيجة النهائية من رئيس القسم')
+  const approveResult = async (id: string) => {
+    await updateApplicant(id, { status: 'النتيجة معتمدة' }, 'اعتماد النتيجة النهائية من رئيس القسم')
   }
 
-  const registerApplicant = () => {
+  const registerApplicant = async () => {
     if (!nationalId || !form.name) return
-    const existing = applicants.find((item) => item.nationalId === nationalId)
-    if (existing) {
-      setSelectedId(existing.id)
-      setRole('applicant')
-      return
+    const response = await fetch('/api/applicants', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        nationalId,
+        name: form.name,
+        phone: form.phone,
+        qualification: form.qualification,
+        gpa: Number(form.gpa),
+      }),
+    })
+    if (response.ok) {
+      const data = (await response.json()) as { applicant: Applicant }
+      setApplicants((current) => [data.applicant, ...current.filter((item) => item.id !== data.applicant.id)])
+      setSelectedId(data.applicant.id)
     }
-    const requestNo = `REQ-2026-${String(applicants.length + 1).padStart(4, '0')}`
-    const applicant: Applicant = {
-      id: crypto.randomUUID(),
-      nationalId,
-      requestNo,
-      name: form.name,
-      phone: form.phone,
-      qualification: form.qualification,
-      gpa: Number(form.gpa),
-      source: 'direct',
-      status: 'بانتظار مراجعة شؤون المتدربين',
-      documents: [
-        { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
-        { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
-        { name: 'نموذج الإقرار', status: 'معتمد' },
-      ],
-      scores: { technical: 0, communication: 0, motivation: 0 },
-      notes: '',
-      audit: ['إنشاء طلب جديد وتأكيد الإقرار'],
-    }
-    saveApplicants([applicant, ...applicants])
-    setSelectedId(applicant.id)
   }
 
-  const resetDemo = () => {
-    localStorage.removeItem('interview-applicants')
+  const resetDemo = async () => {
+    await fetch('/api/reset', { method: 'POST' })
     setApplicants(seedApplicants)
     setSelectedId(seedApplicants[0].id)
   }
