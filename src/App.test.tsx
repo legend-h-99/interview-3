@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
 beforeEach(() => {
+  window.history.pushState({}, '', '/')
   const store = new Map<string, string>()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
@@ -44,6 +45,15 @@ describe('Interview management system', () => {
     expect(screen.getByText('مازن صالح القحطاني')).toBeTruthy()
     expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
     expect(screen.getByText('بانتظار مراجعة شؤون المتدربين')).toBeTruthy()
+  })
+
+  it('opens the applicant portal directly from a dedicated link', () => {
+    window.history.pushState({}, '', '/?view=applicant')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
+    expect(screen.getByLabelText('رقم الهوية الوطنية')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'شؤون المتدربين' })).toBeNull()
   })
 
   it('prevents duplicate applicant registration by national ID', async () => {

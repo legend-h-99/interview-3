@@ -158,7 +158,8 @@ const loadApplicants = () => {
 }
 
 function App() {
-  const [role, setRole] = useState<Role>('trainees')
+  const applicantOnly = new URLSearchParams(window.location.search).get('view') === 'applicant'
+  const [role, setRole] = useState<Role>(applicantOnly ? 'applicant' : 'trainees')
   const [applicants, setApplicants] = useState<Applicant[]>(loadApplicants)
   const [selectedId, setSelectedId] = useState(seedApplicants[0].id)
   const [nationalId, setNationalId] = useState('')
@@ -261,7 +262,7 @@ function App() {
 
   return (
     <main className="app" dir="rtl">
-      <aside className="sidebar">
+      {!applicantOnly && <aside className="sidebar">
         <div className="brand">
           <ShieldCheck size={30} />
           <div>
@@ -284,21 +285,21 @@ function App() {
           <RefreshCcw size={17} />
           استعادة البيانات التجريبية
         </button>
-      </aside>
+      </aside>}
 
-      <section className="workspace">
+      <section className={applicantOnly ? 'workspace applicant-only' : 'workspace'}>
         <header className="topbar">
           <div>
             <p>الكلية التقنية / وحدة القبول والمقابلات</p>
-            <h1>{roles.find((item) => item.id === role)?.label}</h1>
+            <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
           </div>
-          <div className="quick-actions">
+          {!applicantOnly && <div className="quick-actions">
             <button type="button"><Download size={17} /> تصدير Excel</button>
             <button type="button"><FileText size={17} /> تقرير PDF</button>
-          </div>
+          </div>}
         </header>
 
-        {role !== 'applicant' && (
+        {!applicantOnly && role !== 'applicant' && (
           <section className="metrics" aria-label="مؤشرات النظام">
             <Metric icon={Users} label="إجمالي المتقدمين" value={stats.total} />
             <Metric icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} />
