@@ -152,6 +152,9 @@ const questions = [
   'كيف تتعامل مع ضغط الدراسة والعمل ضمن فريق؟',
 ]
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+const apiUrl = (path: string) => `${API_BASE}${path}`
+
 function App() {
   const applicantOnly = new URLSearchParams(window.location.search).get('view') === 'applicant'
   const [role, setRole] = useState<Role>(applicantOnly ? 'applicant' : 'trainees')
@@ -174,7 +177,7 @@ function App() {
   }, [applicants])
 
   const refreshApplicants = async () => {
-    const response = await fetch('/api/applicants')
+    const response = await fetch(apiUrl('/api/applicants'))
     if (!response.ok) throw new Error('Unable to load applicants')
     const data = (await response.json()) as { applicants: Applicant[] }
     setApplicants(data.applicants)
@@ -192,7 +195,7 @@ function App() {
         : applicant,
     )
     setApplicants(next)
-    const response = await fetch(`/api/applicants/${id}`, {
+    const response = await fetch(apiUrl(`/api/applicants/${id}`), {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ patch, audit }),
@@ -234,7 +237,7 @@ function App() {
 
   const registerApplicant = async () => {
     if (!nationalId || !form.name) return
-    const response = await fetch('/api/applicants', {
+    const response = await fetch(apiUrl('/api/applicants'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -253,7 +256,7 @@ function App() {
   }
 
   const resetDemo = async () => {
-    await fetch('/api/reset', { method: 'POST' })
+    await fetch(apiUrl('/api/reset'), { method: 'POST' })
     setApplicants(seedApplicants)
     setSelectedId(seedApplicants[0].id)
   }
@@ -264,7 +267,7 @@ function App() {
         <div className="brand">
           <ShieldCheck size={30} />
           <div>
-            <strong>نظام المقابلات</strong>
+            <strong>interview 3</strong>
             <span>قسم التقنية الخاصة</span>
           </div>
         </div>
@@ -288,7 +291,7 @@ function App() {
       <section className={applicantOnly ? 'workspace applicant-only' : 'workspace'}>
         <header className="topbar">
           <div>
-            <p>الكلية التقنية / وحدة القبول والمقابلات</p>
+            <p>interview 3 / وحدة القبول والمقابلات</p>
             <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
           </div>
           {!applicantOnly && <div className="quick-actions">
