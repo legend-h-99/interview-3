@@ -372,7 +372,7 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
               <td>{applicant.requestNo}</td>
               <td>{applicant.name}</td>
               <td>{applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</td>
-              <td><span className="status">{applicant.status}</span></td>
+              <td><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
               <td>{applicant.waitingNo ?? 'لم يصدر'}</td>
               <td>{applicant.gpa}%</td>
             </tr>
@@ -381,6 +381,13 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
       </table>
     </div>
   )
+}
+
+function statusTone(status: Status) {
+  if (status.includes('معتمدة') || status.includes('معتمد') || status.includes('مكتمل')) return 'success'
+  if (status.includes('استكمال') || status.includes('تصحيح')) return 'danger'
+  if (status.includes('مراجعة') || status.includes('انتظار') || status.includes('اعتماد')) return 'warning'
+  return 'info'
 }
 
 function Details({ applicant }: { applicant: Applicant }) {

@@ -1,11 +1,30 @@
 :root {
+  --font-app: "Segoe UI", Tahoma, Arial, sans-serif;
+  --color-bg-app: #f5f7fa;
+  --color-bg-sidebar: #0b1220;
+  --color-bg-surface: #ffffff;
+  --color-bg-subtle: #f8fafc;
+  --color-text-primary: #182235;
+  --color-text-secondary: #667085;
+  --color-text-inverse: #ffffff;
+  --color-border-default: #d9e2ec;
+  --color-action-primary: #0f6b8f;
+  --color-action-primary-hover: #155e75;
+  --color-status-info-bg: #e0f2fe;
+  --color-status-info-text: #155e75;
+  --color-status-success-bg: #dcfce7;
+  --color-status-success-text: #15803d;
+  --color-status-warning-bg: #fef3c7;
+  --color-status-warning-text: #b45309;
+  --color-status-danger-bg: #fee2e2;
+  --color-status-danger-text: #b91c1c;
+  --shadow-card: 0 12px 34px rgb(15 23 42 / 0.07);
+  --radius-md: 8px;
+  --radius-lg: 12px;
   font-family:
-    "Segoe UI",
-    Tahoma,
-    Arial,
-    sans-serif;
-  color: #18222f;
-  background: #eef2f5;
+    var(--font-app);
+  color: var(--color-text-primary);
+  background: var(--color-bg-app);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
