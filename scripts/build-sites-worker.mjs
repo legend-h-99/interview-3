@@ -38,6 +38,18 @@ async function collectFiles(dirUrl, rootUrl = dirUrl) {
 
 const files = await collectFiles(distDir)
 const acceptedApplicants = JSON.parse(await readFile(new URL('../src/data/acceptedApplicants.json', import.meta.url), 'utf8'))
+const defaultInterviewScores = {
+  signLanguage: 0,
+  appearance: 0,
+  generalInfo: 0,
+  responseSpeed: 0,
+  questionScores: [0, 0, 0, 0, 0],
+  hasAssociatedDifficulty: '',
+  weakHearing: '',
+  knowsSignLanguage: '',
+  weakMentalAbilities: '',
+  distinguished: '',
+}
 
 function normalizeImportedPhone(phone) {
   return phone.startsWith('5') ? `0${phone}` : phone
@@ -64,7 +76,7 @@ function acceptedToApplicant(item, index) {
       { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
       { name: 'نموذج الإقرار', status: 'معتمد' },
     ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    scores: { ...defaultInterviewScores },
     notes: '',
     admissionStatus: item.admissionStatus,
     organization: item.organization,
@@ -102,7 +114,7 @@ const seedApplicants = [
       { name: 'الشهادة الدراسية', status: 'معتمد' },
       { name: 'نموذج الإقرار', status: 'معتمد' },
     ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    scores: { ...defaultInterviewScores },
     notes: '',
     audit: ['استيراد من بوابة قبول', 'اعتماد الوثائق', 'إصدار رقم انتظار'],
   },
@@ -126,7 +138,7 @@ const seedApplicants = [
       { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
       { name: 'نموذج الإقرار', status: 'معتمد' },
     ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    scores: { ...defaultInterviewScores },
     notes: '',
     audit: ['تسجيل مباشر عبر QR', 'رفع الوثائق'],
   },
@@ -155,7 +167,7 @@ const seedApplicants = [
       { name: 'الشهادة الدراسية', status: 'معتمد' },
       { name: 'نموذج الإقرار', status: 'معتمد' },
     ],
-    scores: { technical: 86, communication: 78, motivation: 92 },
+    scores: { ...defaultInterviewScores, signLanguage: 22, appearance: 4, questionScores: [3, 3, 3, 2, 2], generalInfo: 13, responseSpeed: 4 },
     notes: 'حضور جيد ومعرفة تقنية مناسبة.',
     finalResult: 'مقبول',
     audit: ['استيراد من بوابة قبول', 'إدخال تقييم اللجنة', 'بانتظار الاعتماد النهائي'],
@@ -395,7 +407,7 @@ async function createApplicant(env, request) {
       { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
       { name: 'نموذج الإقرار', status: 'معتمد' },
     ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    scores: { ...defaultInterviewScores },
     notes: '',
     audit: [\`إنشاء طلب جديد وإصدار رقم مقابلة \${waitingNo}\`],
   };

@@ -64,7 +64,7 @@ type Applicant = {
   translatorId?: string
   interviewAt?: string
   documents: { name: string; status: 'معتمد' | 'ناقص' | 'بانتظار المراجعة' }[]
-  scores: { technical: number; communication: number; motivation: number }
+  scores: InterviewScores
   notes: string
   finalResult?: 'مقبول' | 'احتياط' | 'غير مقبول'
   admissionStatus?: string
@@ -101,6 +101,24 @@ type AcceptedApplicant = {
   program: string
   preferenceNo: string
   admissionStatus: string
+}
+
+type YesNo = '' | 'نعم' | 'لا'
+
+type InterviewScores = {
+  technical?: number
+  communication?: number
+  motivation?: number
+  signLanguage?: number
+  appearance?: number
+  generalInfo?: number
+  responseSpeed?: number
+  questionScores?: number[]
+  hasAssociatedDifficulty?: YesNo
+  weakHearing?: YesNo
+  knowsSignLanguage?: YesNo
+  weakMentalAbilities?: YesNo
+  distinguished?: YesNo
 }
 
 type InterviewQuestion = {
@@ -318,9 +336,22 @@ const interviewQuestionSets: InterviewQuestion[][] = [
   ],
 ]
 
+const defaultInterviewScores = {
+  signLanguage: 0,
+  appearance: 0,
+  generalInfo: 0,
+  responseSpeed: 0,
+  questionScores: [0, 0, 0, 0, 0],
+  hasAssociatedDifficulty: '' as YesNo,
+  weakHearing: '' as YesNo,
+  knowsSignLanguage: '' as YesNo,
+  weakMentalAbilities: '' as YesNo,
+  distinguished: '' as YesNo,
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'أسئلة الرياضيات', 'أسئلة الإنجليزي']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
@@ -364,32 +395,68 @@ function formatQuestionsForExport(applicant: Applicant, category: InterviewQuest
     .join(' | ')
 }
 
+function normalizeScores(scores: InterviewScores = {}) {
+  const questionScores = [...(scores.questionScores ?? defaultInterviewScores.questionScores)]
+    .slice(0, 5)
+    .map((score) => Math.min(3, Math.max(0, Number(score || 0))))
+  while (questionScores.length < 5) questionScores.push(0)
+  const generalInfo = questionScores.reduce((total, score) => total + score, 0)
+  return {
+    ...defaultInterviewScores,
+    ...scores,
+    signLanguage: Math.min(25, Math.max(0, Number(scores.signLanguage || 0))),
+    appearance: Math.min(5, Math.max(0, Number(scores.appearance || 0))),
+    responseSpeed: Math.min(5, Math.max(0, Number(scores.responseSpeed || 0))),
+    questionScores,
+    generalInfo,
+    hasAssociatedDifficulty: scores.hasAssociatedDifficulty ?? '',
+    weakHearing: scores.weakHearing ?? '',
+    knowsSignLanguage: scores.knowsSignLanguage ?? '',
+    weakMentalAbilities: scores.weakMentalAbilities ?? '',
+    distinguished: scores.distinguished ?? '',
+  }
+}
+
 function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager) {
-  const rows = applicants.map((applicant) => [
-    collegeProfile.collegeName,
-    collegeProfile.departmentName,
-    collegeProfile.departmentHeadAndCommitteeChair,
-    formatManager(selectedManager),
-    collegeProfile.traineeAffairsDeputy,
-    applicant.requestNo,
-    applicant.name,
-    applicant.nationalId,
-    applicant.nationality,
-    applicant.age,
-    applicant.certificateType,
-    applicant.graduationDate,
-    applicant.phone,
-    applicant.extraPhone,
-    applicant.program ?? '',
-    applicant.admissionStatus ?? '',
-    applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر',
-    applicant.status,
-    applicant.waitingNo ?? '',
-    applicant.interviewAt ?? '',
-    applicant.finalResult ?? '',
-    formatQuestionsForExport(applicant, 'رياضيات'),
-    formatQuestionsForExport(applicant, 'إنجليزي'),
-  ])
+  const rows = applicants.map((applicant) => {
+    const scores = normalizeScores(applicant.scores)
+    return [
+      collegeProfile.collegeName,
+      collegeProfile.departmentName,
+      collegeProfile.departmentHeadAndCommitteeChair,
+      formatManager(selectedManager),
+      collegeProfile.traineeAffairsDeputy,
+      applicant.requestNo,
+      applicant.name,
+      applicant.nationalId,
+      applicant.nationality,
+      applicant.age,
+      applicant.certificateType,
+      applicant.graduationDate,
+      applicant.phone,
+      applicant.extraPhone,
+      applicant.program ?? '',
+      applicant.admissionStatus ?? '',
+      applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر',
+      applicant.status,
+      applicant.waitingNo ?? '',
+      applicant.interviewAt ?? '',
+      applicant.finalResult ?? '',
+      scores.signLanguage,
+      scores.appearance,
+      scores.generalInfo,
+      scores.responseSpeed,
+      calculateScore(applicant),
+      scores.hasAssociatedDifficulty,
+      scores.weakHearing,
+      scores.knowsSignLanguage,
+      scores.weakMentalAbilities,
+      scores.distinguished,
+      formatQuestionsForExport(applicant, 'رياضيات'),
+      formatQuestionsForExport(applicant, 'إنجليزي'),
+      applicant.notes,
+    ]
+  })
   const staffRows = staffMembers.map((member) => [member.name, member.computerNo ?? '', member.task])
   const csv = [
     'بيانات المتقدمين',
@@ -421,24 +488,28 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
 
-  const rows = applicants.map((applicant) => `
-    <tr>
-      <td>${escapeHtml(applicant.requestNo)}</td>
-      <td>${escapeHtml(applicant.name)}</td>
-      <td>${escapeHtml(applicant.nationalId)}</td>
-      <td>${escapeHtml(applicant.nationality)}</td>
-      <td>${escapeHtml(applicant.age)}</td>
-      <td>${escapeHtml(applicant.certificateType)}</td>
-      <td>${escapeHtml(applicant.graduationDate)}</td>
-      <td>${escapeHtml(applicant.phone)}</td>
-      <td>${escapeHtml(applicant.extraPhone)}</td>
-      <td>${escapeHtml(applicant.admissionStatus ?? '')}</td>
-      <td>${escapeHtml(applicant.status)}</td>
-      <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
-      <td>${escapeHtml(formatQuestionsForExport(applicant, 'رياضيات'))}</td>
-      <td>${escapeHtml(formatQuestionsForExport(applicant, 'إنجليزي'))}</td>
-    </tr>
-  `).join('')
+  const rows = applicants.map((applicant) => {
+    const scores = normalizeScores(applicant.scores)
+    return `
+      <tr>
+        <td>${escapeHtml(applicant.requestNo)}</td>
+        <td>${escapeHtml(applicant.name)}</td>
+        <td>${escapeHtml(applicant.nationalId)}</td>
+        <td>${escapeHtml(applicant.status)}</td>
+        <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
+        <td>${escapeHtml(scores.signLanguage)}</td>
+        <td>${escapeHtml(scores.appearance)}</td>
+        <td>${escapeHtml(scores.generalInfo)}</td>
+        <td>${escapeHtml(scores.responseSpeed)}</td>
+        <td>${escapeHtml(calculateScore(applicant))}</td>
+        <td>${escapeHtml(scores.hasAssociatedDifficulty || 'لم يحدد')}</td>
+        <td>${escapeHtml(scores.weakHearing || 'لم يحدد')}</td>
+        <td>${escapeHtml(scores.knowsSignLanguage || 'لم يحدد')}</td>
+        <td>${escapeHtml(scores.weakMentalAbilities || 'لم يحدد')}</td>
+        <td>${escapeHtml(scores.distinguished || 'لم يحدد')}</td>
+      </tr>
+    `
+  }).join('')
 
   report.document.write(`
     <!doctype html>
@@ -485,7 +556,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         </section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الجنسية</th><th>العمر</th><th>نوع الشهادة</th><th>تاريخ التخرج</th><th>رقم الجوال</th><th>رقم جوال إضافي</th><th>حالة القبول</th><th>الحالة</th><th>رقم المقابلة</th><th>أسئلة الرياضيات</th><th>أسئلة الإنجليزي</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -599,7 +670,7 @@ function App() {
   }
 
   const submitEvaluation = async (id: string) => {
-    await updateApplicant(id, { status: 'بانتظار اعتماد رئيس القسم', finalResult: calculateScore(selected) >= 75 ? 'مقبول' : 'احتياط' }, 'اعتماد تقييم اللجنة')
+    await updateApplicant(id, { status: 'بانتظار اعتماد رئيس القسم', finalResult: calculateScore(selected) >= 35 ? 'مقبول' : 'احتياط' }, 'اعتماد تقييم اللجنة')
   }
 
   const approveResult = async (id: string) => {
@@ -772,7 +843,8 @@ function App() {
 }
 
 function calculateScore(applicant: Applicant) {
-  return Math.round(applicant.scores.technical * 0.45 + applicant.scores.communication * 0.25 + applicant.scores.motivation * 0.3)
+  const scores = normalizeScores(applicant.scores)
+  return scores.signLanguage + scores.appearance + scores.generalInfo + scores.responseSpeed
 }
 
 function Metric({ icon: Icon, label, value, tone }: { icon: typeof Users; label: string; value: number; tone: 'blue' | 'amber' | 'teal' | 'green' }) {
@@ -830,6 +902,7 @@ function Details({ applicant }: { applicant: Applicant }) {
   const committeeNumber = applicant.committeeNumber ?? committee?.number
   const trainers = staffNames(applicant.committeeTrainerIds)
   const translator = translatorName(applicant.translatorId)
+  const scores = normalizeScores(applicant.scores)
   return (
     <section className="details">
       <div className="profile-header">
@@ -855,7 +928,16 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="المدربون" value={trainers || 'لم يتم الاختيار'} />
         <Info label="المترجم" value={translator ?? 'بدون مترجم'} />
         <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
-        <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 100`} />
+        <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 50`} />
+        <Info label="الإشارة" value={`${scores.signLanguage} من 25`} />
+        <Info label="المظهر العام" value={`${scores.appearance} من 5`} />
+        <Info label="معلومات عامة" value={`${scores.generalInfo} من 15`} />
+        <Info label="سرعة الاستجابة للتعليمات" value={`${scores.responseSpeed} من 5`} />
+        <Info label="صعوبة أو إعاقة مصاحبة" value={scores.hasAssociatedDifficulty || 'لم يحدد'} />
+        <Info label="ضعيف سمع" value={scores.weakHearing || 'لم يحدد'} />
+        <Info label="يتقن لغة الإشارة" value={scores.knowsSignLanguage || 'لم يحدد'} />
+        <Info label="ضعف عام بالقدرات العقلية والاستيعاب" value={scores.weakMentalAbilities || 'لم يحدد'} />
+        <Info label="متقدم متميز" value={scores.distinguished || 'لم يحدد'} />
       </div>
       <h3>الوثائق</h3>
       <div className="docs">
@@ -880,25 +962,26 @@ function Details({ applicant }: { applicant: Applicant }) {
 
 function InterviewQuestions({ applicant }: { applicant: Applicant }) {
   const questions = getApplicantQuestionSet(applicant)
+  const scores = normalizeScores(applicant.scores)
   const mathQuestions = questions.filter((question) => question.category === 'رياضيات')
   const englishQuestions = questions.filter((question) => question.category === 'إنجليزي')
   return (
     <section className="question-card" aria-label="أسئلة المقابلة العامة">
       <div className="question-card-title">
         <h3>أسئلة المقابلة العامة</h3>
-        <span>٣ رياضيات + ٢ إنجليزي</span>
+        <span>معلومات عامة: {scores.generalInfo} من 15</span>
       </div>
       <div className="question-groups">
         <div>
           <strong>رياضيات</strong>
           {mathQuestions.map((question, index) => (
-            <span key={`${question.prompt}-${index}`}>{index + 1}. {question.prompt} <b>الإجابة: {question.answer}</b></span>
+            <span key={`${question.prompt}-${index}`}>{index + 1}. {question.prompt} <b>الإجابة: {question.answer}</b> <em>الدرجة: {scores.questionScores[index]} / 3</em></span>
           ))}
         </div>
         <div>
           <strong>إنجليزي</strong>
           {englishQuestions.map((question, index) => (
-            <span key={`${question.prompt}-${index}`}>{index + 1}. {question.prompt} <b>الإجابة: {question.answer}</b></span>
+            <span key={`${question.prompt}-${index}`}>{index + 1}. {question.prompt} <b>الإجابة: {question.answer}</b> <em>الدرجة: {scores.questionScores[index + mathQuestions.length]} / 3</em></span>
           ))}
         </div>
       </div>
@@ -1061,6 +1144,8 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const selectedStaff = selectedStaffIds
     .map((id) => staffMembers.find((member) => member.id === id))
     .filter((member): member is StaffMember => Boolean(member))
+  const selectedScores = normalizeScores(selected.scores)
+  const selectedQuestions = getApplicantQuestionSet(selected)
   const assigned = applicants.filter((applicant) => {
     const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
     return committeeNumber ? applicantCommitteeNumber === committeeNumber : false
@@ -1082,8 +1167,18 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     updateApplicant(selected.id, { committeeTrainerIds: next }, 'اختيار مدربي اللجنة')
   }
 
-  const setScore = (key: keyof Applicant['scores'], value: number) => {
-    updateApplicant(selected.id, { scores: { ...selected.scores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
+  const setScore = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'signLanguage' | 'appearance' | 'responseSpeed'>, value: number) => {
+    updateApplicant(selected.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
+  }
+
+  const setQuestionScore = (index: number, value: number) => {
+    const nextScores = [...selectedScores.questionScores]
+    nextScores[index] = Math.min(3, Math.max(0, value))
+    updateApplicant(selected.id, { scores: { ...selectedScores, questionScores: nextScores, generalInfo: nextScores.reduce((total, score) => total + score, 0) }, status: 'المقابلة جارية' }, 'حفظ درجة سؤال المعلومات العامة')
+  }
+
+  const setYesNo = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'hasAssociatedDifficulty' | 'weakHearing' | 'knowsSignLanguage' | 'weakMentalAbilities' | 'distinguished'>, value: YesNo) => {
+    updateApplicant(selected.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
   }
   return (
     <div className="grid split">
@@ -1151,9 +1246,29 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
       <section className="panel">
         <Details applicant={selected} />
         <div className="score-form">
-          <Range label="المهارة التقنية" value={selected.scores.technical} onChange={(value) => setScore('technical', value)} />
-          <Range label="التواصل" value={selected.scores.communication} onChange={(value) => setScore('communication', value)} />
-          <Range label="الدافعية والانضباط" value={selected.scores.motivation} onChange={(value) => setScore('motivation', value)} />
+          <Range label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
+          <Range label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />
+          <div className="question-score-form">
+            <div className="question-card-title">
+              <h3>معلومات عامة</h3>
+              <span>{selectedScores.generalInfo} من 15</span>
+            </div>
+            {selectedQuestions.map((question, index) => (
+              <label className="question-score" key={`${question.prompt}-${index}`}>
+                <span>{index + 1}. {question.prompt}</span>
+                <small>الإجابة: {question.answer}</small>
+                <input aria-label={`درجة السؤال ${index + 1}`} max="3" min="0" onChange={(event) => setQuestionScore(index, Number(event.target.value))} type="number" value={selectedScores.questionScores[index]} />
+              </label>
+            ))}
+          </div>
+          <Range label="سرعة الاستجابة للتعليمات" max={5} value={selectedScores.responseSpeed} onChange={(value) => setScore('responseSpeed', value)} />
+          <div className="yes-no-grid">
+            <YesNoField label="هل يوجد صعوبة او إعاقة مصاحبة قد تؤثر على التدريب" value={selectedScores.hasAssociatedDifficulty} onChange={(value) => setYesNo('hasAssociatedDifficulty', value)} />
+            <YesNoField label="هل المتقدم ضعيف سمع" value={selectedScores.weakHearing} onChange={(value) => setYesNo('weakHearing', value)} />
+            <YesNoField label="هل يتقن لغة الإشارة" value={selectedScores.knowsSignLanguage} onChange={(value) => setYesNo('knowsSignLanguage', value)} />
+            <YesNoField label="هل لديه ضعف عام بالقدرات العقلية والاستيعاب" value={selectedScores.weakMentalAbilities} onChange={(value) => setYesNo('weakMentalAbilities', value)} />
+            <YesNoField label="هل المتقدم متميز" value={selectedScores.distinguished} onChange={(value) => setYesNo('distinguished', value)} />
+          </div>
           <textarea value={selected.notes} onChange={(event) => updateApplicant(selected.id, { notes: event.target.value }, 'تحديث ملاحظات المقابلة')} placeholder="ملاحظات المقيم" />
         </div>
         <div className="actions">
@@ -1164,13 +1279,23 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   )
 }
 
-function Range({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function Range({ label, value, max = 100, onChange }: { label: string; value: number; max?: number; onChange: (value: number) => void }) {
   return (
     <label className="range">
-      <span>{label}</span>
-      <input aria-label={label} min="0" max="100" onChange={(event) => onChange(Number(event.target.value))} type="range" value={value} />
+      <span>{label} <small>من {max}</small></span>
+      <input aria-label={label} min="0" max={max} onChange={(event) => onChange(Number(event.target.value))} type="range" value={value} />
       <strong>{value}</strong>
     </label>
+  )
+}
+
+function YesNoField({ label, value, onChange }: { label: string; value: YesNo; onChange: (value: YesNo) => void }) {
+  return (
+    <fieldset className="yes-no-field">
+      <legend>{label}</legend>
+      <label><input checked={value === 'نعم'} onChange={() => onChange('نعم')} type="radio" /> نعم</label>
+      <label><input checked={value === 'لا'} onChange={() => onChange('لا')} type="radio" /> لا</label>
+    </fieldset>
   )
 }
 

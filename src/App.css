@@ -722,6 +722,14 @@ tbody tr.selected {
   font-weight: 800;
 }
 
+.question-groups em {
+  display: inline-block;
+  margin-inline-start: 6px;
+  color: var(--color-action-primary);
+  font-style: normal;
+  font-weight: 800;
+}
+
 .audit {
   display: grid;
   gap: 7px;
@@ -812,6 +820,13 @@ tbody tr.selected {
   min-width: 150px;
 }
 
+.range small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
 .range input {
   flex: 1;
   accent-color: var(--color-action-primary);
@@ -820,6 +835,83 @@ tbody tr.selected {
 .range strong {
   min-width: 36px;
   text-align: center;
+}
+
+.question-score-form,
+.yes-no-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.question-score-form {
+  padding: 12px;
+  border: 1px solid #dbe6ed;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+
+.question-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, auto) 64px;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8ef;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.question-score span,
+.question-score small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.question-score small {
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.question-score input {
+  width: 64px;
+  text-align: center;
+}
+
+.yes-no-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.yes-no-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #e2e8ef;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.yes-no-field legend {
+  width: 100%;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.yes-no-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.yes-no-field input {
+  width: auto;
+  accent-color: var(--color-action-primary);
 }
 
 textarea {
@@ -1072,7 +1164,8 @@ textarea:focus {
   .detail-grid,
   .detail-grid.compact,
   .form-grid,
-  .question-groups {
+  .question-groups,
+  .yes-no-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1096,6 +1189,14 @@ textarea:focus {
 
   .question-card-title span {
     align-self: flex-start;
+  }
+
+  .question-score {
+    grid-template-columns: 1fr;
+  }
+
+  .question-score input {
+    width: 100%;
   }
 
   .hero-badge {

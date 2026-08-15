@@ -266,12 +266,14 @@ describe('Interview management system', () => {
     expect(screen.getByText('عبدالله محمد الفيفي')).toBeTruthy()
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
 
-    const technical = screen.getByLabelText('المهارة التقنية')
-    const communication = screen.getByLabelText('التواصل')
-    const motivation = screen.getByLabelText('الدافعية والانضباط')
-    fireEvent.change(technical, { target: { value: '90' } })
-    fireEvent.change(communication, { target: { value: '80' } })
-    fireEvent.change(motivation, { target: { value: '85' } })
+    fireEvent.change(screen.getByLabelText('الإشارة'), { target: { value: '22' } })
+    fireEvent.change(screen.getByLabelText('المظهر العام'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('سرعة الاستجابة للتعليمات'), { target: { value: '4' } })
+    for (const input of screen.getAllByLabelText(/درجة السؤال/)) {
+      fireEvent.change(input, { target: { value: '3' } })
+    }
+    await user.click(screen.getAllByRole('radio', { name: 'لا' })[0])
+    await user.click(screen.getAllByRole('radio', { name: 'نعم' })[2])
     await user.type(screen.getByPlaceholderText('ملاحظات المقيم'), 'مرشح مناسب للقسم.')
     await user.click(screen.getByRole('button', { name: /اعتماد تقييم المتقدم/ }))
 
@@ -295,7 +297,7 @@ describe('Interview management system', () => {
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
 
     const questions = screen.getByLabelText('أسئلة المقابلة العامة')
-    expect(within(questions).getByText('٣ رياضيات + ٢ إنجليزي')).toBeTruthy()
+    expect(within(questions).getByText(/معلومات عامة:/)).toBeTruthy()
     expect(within(questions).getAllByText(/رياضيات/).length).toBeGreaterThan(0)
     expect(within(questions).getAllByText(/إنجليزي/).length).toBeGreaterThan(0)
     expect(within(questions).getByText(/ما هو الحرف الكبير/)).toBeTruthy()
