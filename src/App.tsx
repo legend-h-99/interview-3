@@ -83,6 +83,7 @@ type CollegeManager = {
 const collegeProfile = {
   collegeName: 'الكلية التقنية للاتصالات والمعلومات',
   departmentName: 'قسم التقنية الخاصة للصم وضعاف السمع',
+  departmentHeadAndCommitteeChair: 'رائد الغفيلي',
   traineeAffairsDeputy: 'محمد الرميح',
 }
 
@@ -109,7 +110,7 @@ const roleDescriptions: Record<Role, string> = {
 }
 
 const staffMembers: StaffMember[] = [
-  { id: 's1', name: 'رائد عبدالعزيز الغفيلي', computerNo: '30487', task: 'رئيس اللجنة' },
+  { id: 's1', name: 'رائد الغفيلي', computerNo: '30487', task: 'رئيس القسم / رئيس اللجنة' },
   { id: 's2', name: 'موسى عبدالرحيم الأنصاري', computerNo: '30004', task: 'المنصة الإلكترونية للفرز' },
   { id: 's3', name: 'حسام الدين عثمان مسملي', computerNo: '28996', task: 'المنصة الإلكترونية للفرز' },
   { id: 's4', name: 'سالم سعيد الشمري', computerNo: '27548', task: 'لجنة 1' },
@@ -210,7 +211,7 @@ const questions = [
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
@@ -245,6 +246,7 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
   const rows = applicants.map((applicant) => [
     collegeProfile.collegeName,
     collegeProfile.departmentName,
+    collegeProfile.departmentHeadAndCommitteeChair,
     formatManager(selectedManager),
     collegeProfile.traineeAffairsDeputy,
     applicant.requestNo,
@@ -334,6 +336,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <section class="identity">
           <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
           <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
+          <div><span>رئيس القسم / رئيس اللجنة</span><strong>${escapeHtml(collegeProfile.departmentHeadAndCommitteeChair)}</strong></div>
           <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
           <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
         </section>
@@ -521,6 +524,7 @@ function App() {
             <p>interview 3 / وحدة القبول والمقابلات</p>
             <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
             <span className="institution-line">{collegeProfile.collegeName} · {collegeProfile.departmentName}</span>
+            <span className="institution-line">رئيس القسم / رئيس اللجنة: {collegeProfile.departmentHeadAndCommitteeChair}</span>
             <span className="topbar-description">{roleDescriptions[activeRole]}</span>
           </div>
           {!applicantOnly && <div className="quick-actions">
