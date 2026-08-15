@@ -369,12 +369,12 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
         <tbody>
           {applicants.map((applicant) => (
             <tr className={selectedId === applicant.id ? 'selected' : ''} key={applicant.id} onClick={() => onSelect(applicant.id)}>
-              <td>{applicant.requestNo}</td>
-              <td>{applicant.name}</td>
-              <td>{applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</td>
-              <td><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
-              <td>{applicant.waitingNo ?? 'لم يصدر'}</td>
-              <td>{applicant.gpa}%</td>
+              <td data-label="رقم الطلب">{applicant.requestNo}</td>
+              <td data-label="المتقدم">{applicant.name}</td>
+              <td data-label="المصدر">{applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</td>
+              <td data-label="الحالة"><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
+              <td data-label="رقم الانتظار">{applicant.waitingNo ?? 'لم يصدر'}</td>
+              <td data-label="المعدل">{applicant.gpa}%</td>
             </tr>
           ))}
         </tbody>

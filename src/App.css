@@ -1,7 +1,7 @@
 .app {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(248px, 280px) minmax(0, 1fr);
   background:
     radial-gradient(circle at top left, rgb(15 107 143 / 0.08), transparent 320px),
     var(--color-bg-app);
@@ -20,6 +20,7 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
+  min-width: 0;
 }
 
 .brand,
@@ -89,6 +90,7 @@ button {
   color: #dbe7f1;
   background: transparent;
   text-align: start;
+  white-space: normal;
   transition:
     background 0.18s ease,
     color 0.18s ease,
@@ -114,7 +116,9 @@ button {
 
 .workspace {
   min-width: 0;
-  padding: 24px;
+  width: 100%;
+  max-width: 1560px;
+  padding: clamp(16px, 2vw, 28px);
 }
 
 .workspace.applicant-only {
@@ -185,7 +189,7 @@ button {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -198,6 +202,7 @@ button {
   border-radius: var(--radius-md);
   background: var(--color-bg-surface);
   box-shadow: var(--shadow-card);
+  min-width: 0;
 }
 
 .metric svg {
@@ -207,11 +212,12 @@ button {
 .metric span {
   color: var(--color-text-secondary);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .metric strong {
   margin-inline-start: auto;
-  font-size: 28px;
+  font-size: clamp(24px, 2.1vw, 30px);
 }
 
 .grid {
@@ -224,7 +230,7 @@ button {
 }
 
 .grid.split {
-  grid-template-columns: minmax(420px, 1.05fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(380px, 1.05fr) minmax(340px, 0.95fr);
 }
 
 .panel {
@@ -240,6 +246,7 @@ button {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+  min-width: 0;
 }
 
 .section-title h2,
@@ -249,6 +256,7 @@ button {
 
 .section-title h2 {
   font-size: 20px;
+  overflow-wrap: anywhere;
 }
 
 .section-title span {
@@ -263,10 +271,16 @@ button {
   margin: 12px 0;
 }
 
+.toolbar button,
+.actions button {
+  flex: 0 1 auto;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid #e2e8ef;
   border-radius: var(--radius-md);
+  max-width: 100%;
 }
 
 table {
@@ -309,6 +323,7 @@ tbody tr.selected {
   background: var(--color-status-info-bg);
   font-size: 12px;
   font-weight: 700;
+  white-space: normal;
 }
 
 .status.success {
@@ -341,6 +356,10 @@ tbody tr.selected {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.form-grid button {
+  align-self: end;
 }
 
 .info {
@@ -378,6 +397,8 @@ tbody tr.selected {
   color: #314155;
   background: #edf2f6;
   font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .audit {
@@ -463,6 +484,7 @@ tbody tr.selected {
   padding: 12px;
   border: 1px solid #e2e8ef;
   border-radius: var(--radius-md);
+  min-width: 0;
 }
 
 .range span {
@@ -509,6 +531,7 @@ textarea:focus {
 .applicant-shell {
   max-width: 980px;
   margin: 0 auto;
+  width: 100%;
 }
 
 .applicant-card {
@@ -545,42 +568,202 @@ textarea:focus {
   .sidebar {
     position: static;
     height: auto;
+    padding: 18px;
   }
 
   .sidebar nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(130px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .sidebar nav button {
+    justify-content: center;
+    min-width: 130px;
+  }
+
+  .ghost {
+    margin-top: 0;
+    justify-content: center;
   }
 
   .grid.two,
-  .grid.split,
-  .metrics {
+  .grid.split {
     grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 680px) {
-  .workspace {
+  .app {
+    background: var(--color-bg-app);
+  }
+
+  .sidebar {
+    gap: 14px;
     padding: 14px;
+  }
+
+  .workspace {
+    padding: 12px;
   }
 
   .topbar,
   .quick-actions,
-  .brand {
+  .brand,
+  .section-title {
     align-items: stretch;
   }
 
   .topbar,
-  .quick-actions {
+  .quick-actions,
+  .section-title {
     flex-direction: column;
   }
 
-  .sidebar nav,
+  .topbar h1 {
+    font-size: 25px;
+  }
+
+  .quick-actions button,
+  .toolbar button,
+  .actions button,
+  .form-grid button {
+    width: 100%;
+  }
+
+  .sidebar nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+
+  .sidebar nav button {
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .metrics,
   .detail-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
 
+  .panel {
+    padding: 14px;
+    border-radius: var(--radius-md);
+  }
+
+  .metric {
+    min-height: 72px;
+  }
+
+  .metric strong {
+    font-size: 24px;
+  }
+
   .range {
     flex-wrap: wrap;
+  }
+
+  .range span,
+  .range strong {
+    min-width: auto;
+  }
+
+  .range input {
+    flex-basis: 100%;
+    order: 3;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand {
+    gap: 10px;
+  }
+
+  .brand svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sidebar nav {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  tbody tr {
+    padding: 12px;
+    border: 1px solid #e2e8ef;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    box-shadow: 0 8px 20px rgb(15 23 42 / 0.05);
+  }
+
+  tbody tr:hover,
+  tbody tr.selected {
+    background: #f8fcfd;
+    border-color: rgb(15 107 143 / 0.35);
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 8px 0;
+    border-bottom: 1px solid #eef2f6;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  td:last-child {
+    border-bottom: 0;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .qr-box {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+@media (min-width: 1500px) {
+  .workspace {
+    justify-self: center;
   }
 }
