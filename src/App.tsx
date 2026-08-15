@@ -128,6 +128,9 @@ const committees: Committee[] = [
   { id: 'c3', number: '3' },
 ]
 
+const trainerMembers = staffMembers.filter((member) => member.task.startsWith('لجنة '))
+const translatorMembers = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
+
 export const seedApplicants: Applicant[] = [
   {
     id: 'a1',
@@ -223,8 +226,8 @@ function formatCommittee(committee: Committee) {
   return `لجنة ${committee.number}`
 }
 
-function formatStaffMember(member: StaffMember) {
-  return `${member.name} - ${member.computerNo ?? 'بدون رقم حاسب'} - ${member.task}`
+function formatTrainerOption(member: StaffMember) {
+  return `${member.name} - ${member.computerNo ?? 'بدون رقم حاسب'}`
 }
 
 function staffNames(ids: string[] | undefined) {
@@ -756,8 +759,6 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
   const [committeeNumber, setCommitteeNumber] = useState(initialCommitteeNumber)
   const [trainerIds, setTrainerIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
   const [translatorId, setTranslatorId] = useState(selected.translatorId ?? '')
-  const trainers = staffMembers.filter((member) => member.task === `لجنة ${committeeNumber}`)
-  const translators = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
 
   useEffect(() => {
     const nextCommitteeNumber = selected.committeeNumber ?? committees.find((committee) => committee.id === selected.committeeId)?.number ?? ''
@@ -795,7 +796,7 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
           <div className="choice-block">
             <strong>اختيار المدربين</strong>
             <div className="check-list">
-              {trainers.map((trainer) => (
+              {trainerMembers.map((trainer) => (
                 <label className="check-item" key={trainer.id}>
                   <input checked={trainerIds.includes(trainer.id)} onChange={() => toggleTrainer(trainer.id)} type="checkbox" />
                   <span>{trainer.name}</span>
@@ -807,8 +808,8 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
               اختيار مترجم اختياري
               <select aria-label="اختيار مترجم اختياري" value={translatorId} onChange={(event) => setTranslatorId(event.target.value)}>
                 <option value="">بدون مترجم</option>
-                {translators.map((translator) => (
-                  <option key={translator.id} value={translator.id}>{formatStaffMember(translator)}</option>
+                {translatorMembers.map((translator) => (
+                  <option key={translator.id} value={translator.id}>{formatTrainerOption(translator)}</option>
                 ))}
               </select>
             </label>
@@ -844,11 +845,11 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   submitEvaluation: (id: string) => void
 }) {
   const [committeeNumber, setCommitteeNumber] = useState('')
-  const trainers = staffMembers.filter((member) => member.task === `لجنة ${committeeNumber}`)
-  const translators = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
-  const [selectedStaffId, setSelectedStaffId] = useState(trainers[0]?.id ?? '')
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
   const [translatorId, setTranslatorId] = useState(selected.translatorId ?? '')
-  const selectedStaff = staffMembers.find((member) => member.id === selectedStaffId)
+  const selectedStaff = selectedStaffIds
+    .map((id) => staffMembers.find((member) => member.id === id))
+    .filter((member): member is StaffMember => Boolean(member))
   const assigned = applicants.filter((applicant) => {
     const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
     return committeeNumber ? applicantCommitteeNumber === committeeNumber : false
@@ -856,15 +857,18 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
 
   useEffect(() => {
     setTranslatorId(committeeNumber ? selected.translatorId ?? '' : '')
-  }, [committeeNumber, selected.id, selected.translatorId])
-
-  useEffect(() => {
-    setSelectedStaffId((current) => trainers.some((trainer) => trainer.id === current) ? current : trainers[0]?.id ?? '')
-  }, [committeeNumber])
+    setSelectedStaffIds(committeeNumber ? selected.committeeTrainerIds ?? [] : [])
+  }, [committeeNumber, selected.id, selected.committeeTrainerIds, selected.translatorId])
 
   const selectTranslator = (value: string) => {
     setTranslatorId(value)
     updateApplicant(selected.id, { translatorId: value || undefined }, value ? 'اختيار مترجم المقابلة' : 'إلغاء مترجم المقابلة')
+  }
+
+  const toggleStaff = (id: string) => {
+    const next = selectedStaffIds.includes(id) ? selectedStaffIds.filter((item) => item !== id) : [...selectedStaffIds, id]
+    setSelectedStaffIds(next)
+    updateApplicant(selected.id, { committeeTrainerIds: next }, 'اختيار مدربي اللجنة')
   }
 
   const setScore = (key: keyof Applicant['scores'], value: number) => {
@@ -883,6 +887,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
               const nextCommitteeNumber = event.target.value
               setCommitteeNumber(nextCommitteeNumber)
               setTranslatorId('')
+              setSelectedStaffIds([])
               const firstAssignedApplicant = applicants.find((applicant) => {
                 const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
                 return applicantCommitteeNumber === nextCommitteeNumber
@@ -900,28 +905,32 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
         </label>
         {committeeNumber && (
           <>
-            <label className="list-select">
-              اختيار اسم المدرب
-              <select aria-label="اختيار اسم المدرب" value={selectedStaffId} onChange={(event) => setSelectedStaffId(event.target.value)}>
-                {trainers.map((member) => (
-                  <option key={member.id} value={member.id}>{formatStaffMember(member)}</option>
+            <div className="choice-block">
+              <strong>اختيار المدربين</strong>
+              <div className="check-list">
+                {trainerMembers.map((member) => (
+                  <label className="check-item" key={member.id}>
+                    <input checked={selectedStaffIds.includes(member.id)} onChange={() => toggleStaff(member.id)} type="checkbox" />
+                    <span>{member.name}</span>
+                    <small>{member.computerNo ?? 'بدون رقم حاسب'}</small>
+                  </label>
                 ))}
-              </select>
-            </label>
+              </div>
+            </div>
             <label className="list-select">
               اختيار مترجم اختياري
               <select aria-label="اختيار مترجم المقابلة اختياري" value={translatorId} onChange={(event) => selectTranslator(event.target.value)}>
                 <option value="">بدون مترجم</option>
-                {translators.map((translator) => (
-                  <option key={translator.id} value={translator.id}>{formatStaffMember(translator)}</option>
+                {translatorMembers.map((translator) => (
+                  <option key={translator.id} value={translator.id}>{formatTrainerOption(translator)}</option>
                 ))}
               </select>
             </label>
-            {selectedStaff && (
+            {selectedStaff.length > 0 && (
               <div className="detail-grid compact">
-                <Info label="الاسم" value={selectedStaff.name} />
-                <Info label="رقم الحاسب" value={selectedStaff.computerNo ?? 'غير متوفر'} />
-                <Info label="المهام" value={selectedStaff.task} />
+                <Info label="المدربون" value={selectedStaff.map((member) => member.name).join('، ')} />
+                <Info label="أرقام الحاسب" value={selectedStaff.map((member) => member.computerNo ?? 'غير متوفر').join('، ')} />
+                <Info label="اللجنة المختارة" value={`لجنة ${committeeNumber}`} />
               </div>
             )}
           </>
