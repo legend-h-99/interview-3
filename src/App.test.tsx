@@ -285,4 +285,20 @@ describe('Interview management system', () => {
 
     expect(screen.getAllByText('النتيجة معتمدة').length).toBeGreaterThan(0)
   })
+
+  it('shows fixed math and English interview questions for the selected applicant', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
+    await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
+
+    const questions = screen.getByLabelText('أسئلة المقابلة العامة')
+    expect(within(questions).getByText('٣ رياضيات + ٢ إنجليزي')).toBeTruthy()
+    expect(within(questions).getAllByText(/رياضيات/).length).toBeGreaterThan(0)
+    expect(within(questions).getAllByText(/إنجليزي/).length).toBeGreaterThan(0)
+    expect(within(questions).getByText(/ما هو الحرف الكبير/)).toBeTruthy()
+    expect(within(questions).getAllByText(/الإجابة:/)).toHaveLength(5)
+  })
 })

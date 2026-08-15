@@ -103,6 +103,12 @@ type AcceptedApplicant = {
   admissionStatus: string
 }
 
+type InterviewQuestion = {
+  category: 'رياضيات' | 'إنجليزي'
+  prompt: string
+  answer: string
+}
+
 const collegeProfile = {
   collegeName: 'الكلية التقنية للاتصالات والمعلومات',
   departmentName: 'قسم التقنية الخاصة للصم وضعاف السمع',
@@ -281,15 +287,40 @@ export const seedApplicants: Applicant[] = [
   },
 ]
 
-const questions = [
-  'عرّف بنفسك وسبب رغبتك في قسم التقنية الخاصة.',
-  'اشرح تجربة تقنية أو مشروعًا بسيطًا عملت عليه.',
-  'كيف تتعامل مع ضغط الدراسة والعمل ضمن فريق؟',
+const interviewQuestionSets: InterviewQuestion[][] = [
+  [
+    { category: 'رياضيات', prompt: '٤ + ٥ =', answer: '٩' },
+    { category: 'رياضيات', prompt: '٨ - ٢ =', answer: '٦' },
+    { category: 'رياضيات', prompt: '٦ × ٥ =', answer: '٣٠' },
+    { category: 'إنجليزي', prompt: 'ما هو الحرف الكبير من g؟', answer: 'G' },
+    { category: 'إنجليزي', prompt: 'ما معنى كلمة Home؟', answer: 'منزل' },
+  ],
+  [
+    { category: 'رياضيات', prompt: '٧ + ٢ =', answer: '٩' },
+    { category: 'رياضيات', prompt: '١٠ - ٤ =', answer: '٦' },
+    { category: 'رياضيات', prompt: '٦ × ٢ =', answer: '١٢' },
+    { category: 'إنجليزي', prompt: 'ما هو الحرف الكبير من a؟', answer: 'A' },
+    { category: 'إنجليزي', prompt: 'ما معنى كلمة Car؟', answer: 'سيارة' },
+  ],
+  [
+    { category: 'رياضيات', prompt: '٣ + ٨ =', answer: '١١' },
+    { category: 'رياضيات', prompt: '٦ - ٤ =', answer: '٢' },
+    { category: 'رياضيات', prompt: '٤ × ٥ =', answer: '٢٠' },
+    { category: 'إنجليزي', prompt: 'ما هو الحرف الكبير من r؟', answer: 'R' },
+    { category: 'إنجليزي', prompt: 'ما معنى كلمة Table؟', answer: 'طاولة' },
+  ],
+  [
+    { category: 'رياضيات', prompt: '٨ + ٢ =', answer: '١٠' },
+    { category: 'رياضيات', prompt: '٩ - ٤ =', answer: '٥' },
+    { category: 'رياضيات', prompt: '٤ × ٣ =', answer: '١٢' },
+    { category: 'إنجليزي', prompt: 'ما هو الحرف الكبير من h؟', answer: 'H' },
+    { category: 'إنجليزي', prompt: 'ما معنى كلمة city؟', answer: 'مدينة' },
+  ],
 ]
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'أسئلة الرياضيات', 'أسئلة الإنجليزي']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
@@ -320,6 +351,19 @@ function translatorName(id: string | undefined) {
   return id ? staffMembers.find((member) => member.id === id)?.name : undefined
 }
 
+function getApplicantQuestionSet(applicant: Applicant) {
+  const numericSeed = Number(applicant.nationalId.slice(-2))
+  const fallbackSeed = applicant.nationalId.split('').reduce((total, char) => total + char.charCodeAt(0), 0)
+  return interviewQuestionSets[(Number.isFinite(numericSeed) ? numericSeed : fallbackSeed) % interviewQuestionSets.length]
+}
+
+function formatQuestionsForExport(applicant: Applicant, category: InterviewQuestion['category']) {
+  return getApplicantQuestionSet(applicant)
+    .filter((question) => question.category === category)
+    .map((question) => `${question.prompt} الإجابة: ${question.answer}`)
+    .join(' | ')
+}
+
 function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager) {
   const rows = applicants.map((applicant) => [
     collegeProfile.collegeName,
@@ -343,6 +387,8 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
     applicant.waitingNo ?? '',
     applicant.interviewAt ?? '',
     applicant.finalResult ?? '',
+    formatQuestionsForExport(applicant, 'رياضيات'),
+    formatQuestionsForExport(applicant, 'إنجليزي'),
   ])
   const staffRows = staffMembers.map((member) => [member.name, member.computerNo ?? '', member.task])
   const csv = [
@@ -389,6 +435,8 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
       <td>${escapeHtml(applicant.admissionStatus ?? '')}</td>
       <td>${escapeHtml(applicant.status)}</td>
       <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
+      <td>${escapeHtml(formatQuestionsForExport(applicant, 'رياضيات'))}</td>
+      <td>${escapeHtml(formatQuestionsForExport(applicant, 'إنجليزي'))}</td>
     </tr>
   `).join('')
 
@@ -437,7 +485,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         </section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الجنسية</th><th>العمر</th><th>نوع الشهادة</th><th>تاريخ التخرج</th><th>رقم الجوال</th><th>رقم جوال إضافي</th><th>حالة القبول</th><th>الحالة</th><th>رقم المقابلة</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الجنسية</th><th>العمر</th><th>نوع الشهادة</th><th>تاريخ التخرج</th><th>رقم الجوال</th><th>رقم جوال إضافي</th><th>حالة القبول</th><th>الحالة</th><th>رقم المقابلة</th><th>أسئلة الرياضيات</th><th>أسئلة الإنجليزي</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -815,6 +863,7 @@ function Details({ applicant }: { applicant: Applicant }) {
           <span key={document.name}><FileCheck2 size={16} /> {document.name}: {document.status}</span>
         ))}
       </div>
+      <InterviewQuestions applicant={applicant} />
       {applicant.notes && (
         <>
           <h3>ملاحظات المقابلة</h3>
@@ -825,6 +874,34 @@ function Details({ applicant }: { applicant: Applicant }) {
       <ul className="audit">
         {applicant.audit.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
       </ul>
+    </section>
+  )
+}
+
+function InterviewQuestions({ applicant }: { applicant: Applicant }) {
+  const questions = getApplicantQuestionSet(applicant)
+  const mathQuestions = questions.filter((question) => question.category === 'رياضيات')
+  const englishQuestions = questions.filter((question) => question.category === 'إنجليزي')
+  return (
+    <section className="question-card" aria-label="أسئلة المقابلة العامة">
+      <div className="question-card-title">
+        <h3>أسئلة المقابلة العامة</h3>
+        <span>٣ رياضيات + ٢ إنجليزي</span>
+      </div>
+      <div className="question-groups">
+        <div>
+          <strong>رياضيات</strong>
+          {mathQuestions.map((question, index) => (
+            <span key={`${question.prompt}-${index}`}>{index + 1}. {question.prompt} <b>الإجابة: {question.answer}</b></span>
+          ))}
+        </div>
+        <div>
+          <strong>إنجليزي</strong>
+          {englishQuestions.map((question, index) => (
+            <span key={`${question.prompt}-${index}`}>{index + 1}. {question.prompt} <b>الإجابة: {question.answer}</b></span>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
@@ -963,9 +1040,6 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
       </section>
       <section className="panel">
         <Details applicant={selected} />
-        <div className="rubric">
-          {questions.map((question, index) => <span key={question}>{index + 1}. {question}</span>)}
-        </div>
         <div className="actions">
           <button onClick={() => approveResult(selected.id)} type="button"><ShieldCheck size={17} /> اعتماد النتيجة النهائية</button>
         </div>
