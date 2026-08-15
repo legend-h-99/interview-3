@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App, { seedApplicants } from './App'
+import App, { computeVisualAnalytics, seedApplicants } from './App'
 
 let apiApplicants = structuredClone(seedApplicants)
 
@@ -128,6 +128,27 @@ describe('Interview management system', () => {
     expect(screen.getByRole('button', { name: 'رئيس القسم' }).className).toContain('active')
   })
 
+  it('shows visual analytics in the college dashboard', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
+
+    expect(screen.getByLabelText('الرسوم والمؤشرات')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'توزيع حالات الطلبات' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'توزيع النتائج' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'متوسطات التقييم' })).toBeTruthy()
+  })
+
+  it('computes visual analytics distributions and score averages', () => {
+    const analytics = computeVisualAnalytics(seedApplicants)
+
+    expect(analytics.status.reduce((total, item) => total + item.value, 0)).toBe(seedApplicants.length)
+    expect(analytics.results.reduce((total, item) => total + item.value, 0)).toBe(seedApplicants.length)
+    expect(analytics.committees.reduce((total, item) => total + item.value, 0)).toBe(seedApplicants.length)
+    expect(analytics.scores.find((item) => item.label === 'المجموع')?.max).toBe(50)
+  })
+
   it('exports applicants and college identity to an Excel-compatible CSV file', async () => {
     const user = userEvent.setup()
     const createObjectUrl = vi.fn(() => 'blob:interview-3-export')
@@ -170,6 +191,9 @@ describe('Interview management system', () => {
 
     expect(window.open).toHaveBeenCalled()
     expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير interview 3'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('الرسوم والمؤشرات'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('توزيع حالات الطلبات'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('متوسطات التقييم'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('الكلية التقنية للاتصالات والمعلومات'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('قسم التقنية الخاصة للصم وضعاف السمع'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('وكيل التدريب: أحمد الطلحي'))
@@ -213,6 +237,15 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
     expect(screen.getByText('تركي ناصر الحربي')).toBeTruthy()
+  })
+
+  it('does not show public visual analytics in the applicant-only page', () => {
+    window.history.pushState({}, '', '/?view=applicant')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
+    expect(screen.queryByLabelText('الرسوم والمؤشرات')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'توزيع حالات الطلبات' })).toBeNull()
   })
 
   it('prevents duplicate applicant registration by national ID', async () => {

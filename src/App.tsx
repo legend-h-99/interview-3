@@ -127,6 +127,12 @@ type InterviewQuestion = {
   answer: string
 }
 
+type ChartDatum = {
+  label: string
+  value: number
+  color: string
+}
+
 const collegeProfile = {
   collegeName: 'الكلية التقنية للاتصالات والمعلومات',
   departmentName: 'قسم التقنية الخاصة للصم وضعاف السمع',
@@ -350,6 +356,8 @@ const defaultInterviewScores = {
   distinguished: '' as YesNo,
 }
 
+const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
 const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
@@ -485,9 +493,87 @@ function escapeHtml(value: string | number | undefined) {
     .replaceAll("'", '&#039;')
 }
 
+function pdfBarChart(title: string, data: ChartDatum[]) {
+  const max = Math.max(...data.map((item) => item.value), 0)
+  const rows = max === 0
+    ? '<p class="empty">لا توجد بيانات كافية</p>'
+    : data.map((item) => `
+      <div class="pdf-bar-row">
+        <span>${escapeHtml(item.label)}</span>
+        <div><i style="width:${Math.max(7, (item.value / max) * 100)}%;background:${item.color}"></i></div>
+        <strong>${item.value}</strong>
+      </div>
+    `).join('')
+  return `<article class="pdf-chart"><h3>${escapeHtml(title)}</h3>${rows}</article>`
+}
+
+function pdfDonutChart(title: string, data: ChartDatum[]) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  let offset = 0
+  const radius = 42
+  const circumference = 2 * Math.PI * radius
+  const segments = total === 0 ? '' : data.filter((item) => item.value > 0).map((item) => {
+    const dash = (item.value / total) * circumference
+    const segment = `<circle cx="55" cy="55" fill="none" r="${radius}" stroke="${item.color}" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" stroke-linecap="round" stroke-width="16"></circle>`
+    offset += dash
+    return segment
+  }).join('')
+  const legend = data.map((item) => `<span><i style="background:${item.color}"></i>${escapeHtml(item.label)}: ${item.value}</span>`).join('')
+  return `
+    <article class="pdf-chart">
+      <h3>${escapeHtml(title)}</h3>
+      ${total === 0 ? '<p class="empty">لا توجد بيانات كافية</p>' : `
+        <div class="pdf-donut">
+          <svg viewBox="0 0 110 110" width="150" height="150">
+            <circle cx="55" cy="55" fill="none" r="${radius}" stroke="#e7eef5" stroke-width="16"></circle>
+            ${segments}
+            <text dominant-baseline="middle" text-anchor="middle" x="55" y="55">${total}</text>
+          </svg>
+          <div>${legend}</div>
+        </div>
+      `}
+    </article>
+  `
+}
+
+function pdfScoreBars(scores: ReturnType<typeof computeVisualAnalytics>['scores']) {
+  return `
+    <article class="pdf-chart">
+      <h3>متوسطات التقييم</h3>
+      ${scores.map((score) => `
+        <div class="pdf-bar-row">
+          <span>${escapeHtml(score.label)}</span>
+          <div><i style="width:${score.max ? (score.value / score.max) * 100 : 0}%;background:${score.color}"></i></div>
+          <strong>${score.value}/${score.max}</strong>
+        </div>
+      `).join('')}
+    </article>
+  `
+}
+
+function pdfYesNoSummary(items: ReturnType<typeof computeVisualAnalytics>['yesNo']) {
+  return `
+    <article class="pdf-chart">
+      <h3>مؤشرات نعم / لا</h3>
+      ${items.map((item) => {
+        const percent = item.total ? Math.round((item.yes / item.total) * 100) : 0
+        return `<div class="pdf-yes-no"><span>${escapeHtml(item.label)}</span><strong>${item.total ? `${percent}% نعم` : 'لا توجد بيانات'}</strong></div>`
+      }).join('')}
+    </article>
+  `
+}
+
 function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }, selectedManager: CollegeManager) {
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
+  const analytics = computeVisualAnalytics(applicants)
+  const charts = [
+    pdfBarChart('توزيع حالات الطلبات', analytics.status),
+    pdfDonutChart('توزيع النتائج', analytics.results),
+    pdfBarChart('توزيع اللجان', analytics.committees),
+    pdfScoreBars(analytics.scores),
+    pdfYesNoSummary(analytics.yesNo),
+  ].join('')
 
   const rows = applicants.map((applicant) => {
     const scores = normalizeScores(applicant.scores)
@@ -531,6 +617,19 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
           .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; }
           .metric span { display: block; color: #667085; font-size: 12px; }
           .metric strong { display: block; margin-top: 6px; font-size: 24px; }
+          .pdf-visuals { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; }
+          .pdf-chart { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; break-inside: avoid; }
+          .pdf-chart h3 { margin: 0 0 10px; font-size: 16px; }
+          .pdf-bar-row { display: grid; grid-template-columns: 120px 1fr 44px; gap: 8px; align-items: center; margin: 8px 0; font-size: 12px; }
+          .pdf-bar-row div { height: 10px; border-radius: 999px; background: #edf3f7; overflow: hidden; }
+          .pdf-bar-row i { display: block; height: 100%; border-radius: inherit; }
+          .pdf-donut { display: flex; align-items: center; gap: 12px; }
+          .pdf-donut svg { transform: rotate(-90deg); }
+          .pdf-donut text { transform: rotate(90deg); transform-origin: center; fill: #182235; font-weight: 700; }
+          .pdf-donut span { display: block; margin: 5px 0; font-size: 12px; }
+          .pdf-donut i { display: inline-block; width: 9px; height: 9px; margin-inline-end: 5px; border-radius: 50%; }
+          .pdf-yes-no { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid #edf3f7; font-size: 12px; }
+          .empty { color: #667085; }
           table { width: 100%; border-collapse: collapse; }
           th, td { border: 1px solid #d9e2ec; padding: 10px; text-align: right; font-size: 13px; }
           th { background: #fafdff; color: #667085; }
@@ -555,6 +654,8 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
           <div class="metric"><span>مواعيد مجدولة</span><strong>${stats.scheduled}</strong></div>
           <div class="metric"><span>نتائج معتمدة</span><strong>${stats.approved}</strong></div>
         </section>
+        <h2>الرسوم والمؤشرات</h2>
+        <section class="pdf-visuals">${charts}</section>
         <table>
           <thead>
             <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
@@ -859,12 +960,180 @@ function calculateScore(applicant: Applicant) {
   return scores.signLanguage + scores.appearance + scores.generalInfo + scores.responseSpeed
 }
 
+function chartDatum(label: string, value: number, index: number): ChartDatum {
+  return { label, value, color: chartColors[index % chartColors.length] }
+}
+
+function countMatching(applicants: Applicant[], predicate: (applicant: Applicant) => boolean) {
+  return applicants.filter(predicate).length
+}
+
+function averageScore(applicants: Applicant[], selector: (scores: ReturnType<typeof normalizeScores>, applicant: Applicant) => number) {
+  if (applicants.length === 0) return 0
+  const total = applicants.reduce((sum, applicant) => sum + selector(normalizeScores(applicant.scores), applicant), 0)
+  return Math.round(total / applicants.length)
+}
+
+function yesNoCounts(applicants: Applicant[], selector: (scores: ReturnType<typeof normalizeScores>) => YesNo) {
+  const answered = applicants
+    .map((applicant) => selector(normalizeScores(applicant.scores)))
+    .filter((value): value is 'نعم' | 'لا' => value === 'نعم' || value === 'لا')
+  const yes = answered.filter((value) => value === 'نعم').length
+  const no = answered.length - yes
+  return { yes, no, total: answered.length }
+}
+
+export function computeVisualAnalytics(applicants: Applicant[]) {
+  const statusLabels = Array.from(new Set(applicants.map((applicant) => applicant.status)))
+  const resultLabels = ['مقبول', 'احتياط', 'غير مقبول', 'غير محدد']
+  const committeeLabels = ['لجنة 1', 'لجنة 2', 'لجنة 3', 'غير موزع']
+  return {
+    status: statusLabels.map((label, index) => chartDatum(label, countMatching(applicants, (applicant) => applicant.status === label), index)),
+    results: resultLabels.map((label, index) => chartDatum(label, countMatching(applicants, (applicant) => (applicant.finalResult ?? 'غير محدد') === label), index)),
+    committees: committeeLabels.map((label, index) => chartDatum(label, countMatching(applicants, (applicant) => {
+      const number = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
+      return label === 'غير موزع' ? !number : label === `لجنة ${number}`
+    }), index)),
+    scores: [
+      { label: 'الإشارة', value: averageScore(applicants, (scores) => scores.signLanguage), max: 25, color: chartColors[0] },
+      { label: 'المظهر', value: averageScore(applicants, (scores) => scores.appearance), max: 5, color: chartColors[1] },
+      { label: 'معلومات عامة', value: averageScore(applicants, (scores) => scores.generalInfo), max: 15, color: chartColors[2] },
+      { label: 'سرعة الاستجابة', value: averageScore(applicants, (scores) => scores.responseSpeed), max: 5, color: chartColors[3] },
+      { label: 'المجموع', value: averageScore(applicants, (_scores, applicant) => calculateScore(applicant)), max: 50, color: chartColors[4] },
+    ],
+    yesNo: [
+      { label: 'إعاقة مصاحبة', ...yesNoCounts(applicants, (scores) => scores.hasAssociatedDifficulty) },
+      { label: 'ضعيف سمع', ...yesNoCounts(applicants, (scores) => scores.weakHearing) },
+      { label: 'يتقن الإشارة', ...yesNoCounts(applicants, (scores) => scores.knowsSignLanguage) },
+      { label: 'ضعف القدرات', ...yesNoCounts(applicants, (scores) => scores.weakMentalAbilities) },
+      { label: 'متميز', ...yesNoCounts(applicants, (scores) => scores.distinguished) },
+    ],
+  }
+}
+
 function Metric({ icon: Icon, label, value, tone }: { icon: typeof Users; label: string; value: number; tone: 'blue' | 'amber' | 'teal' | 'green' }) {
   return (
     <article className={`metric ${tone}`}>
       <Icon size={22} />
       <span>{label}</span>
       <strong>{value}</strong>
+    </article>
+  )
+}
+
+function VisualAnalyticsPanel({ applicants, mode = 'full' }: { applicants: Applicant[]; mode?: 'full' | 'operations' | 'head' | 'committee' }) {
+  const analytics = computeVisualAnalytics(applicants)
+  if (applicants.length === 0) return <EmptyChartCard />
+  if (mode === 'operations') {
+    return <section className="visual-grid"><BarChartCard title="توزيع حالات الطلبات" data={analytics.status} /></section>
+  }
+  if (mode === 'head') {
+    return <section className="visual-grid"><BarChartCard title="توزيع المتقدمين على اللجان" data={analytics.committees} /><DonutChartCard title="توزيع النتائج" data={analytics.results} /></section>
+  }
+  if (mode === 'committee') {
+    return <section className="visual-grid"><ScoreBarsCard title="متوسطات تقييم المقابلة" scores={analytics.scores} /><YesNoSummaryCard title="مؤشرات نعم / لا" items={analytics.yesNo} /></section>
+  }
+  return (
+    <section className="visual-grid visual-grid-wide" aria-label="الرسوم والمؤشرات">
+      <BarChartCard title="توزيع حالات الطلبات" data={analytics.status} />
+      <DonutChartCard title="توزيع النتائج" data={analytics.results} />
+      <BarChartCard title="توزيع اللجان" data={analytics.committees} />
+      <ScoreBarsCard title="متوسطات التقييم" scores={analytics.scores} />
+      <YesNoSummaryCard title="مؤشرات نعم / لا" items={analytics.yesNo} />
+    </section>
+  )
+}
+
+function EmptyChartCard() {
+  return (
+    <section className="visual-grid">
+      <article className="chart-card empty-chart"><strong>لا توجد بيانات كافية</strong><span>ستظهر الرسوم بعد توفر بيانات المتقدمين.</span></article>
+    </section>
+  )
+}
+
+function BarChartCard({ title, data }: { title: string; data: ChartDatum[] }) {
+  const max = Math.max(...data.map((item) => item.value), 0)
+  return (
+    <article className="chart-card">
+      <h3>{title}</h3>
+      {max === 0 ? <p className="chart-empty">لا توجد بيانات كافية</p> : (
+        <div className="bar-chart">
+          {data.map((item) => (
+            <div className="bar-row" key={item.label}>
+              <span>{item.label}</span>
+              <div><i style={{ background: item.color, width: `${Math.max(7, (item.value / max) * 100)}%` }} /></div>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  )
+}
+
+function DonutChartCard({ title, data }: { title: string; data: ChartDatum[] }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  let offset = 0
+  const radius = 45
+  const circumference = 2 * Math.PI * radius
+  return (
+    <article className="chart-card donut-card">
+      <h3>{title}</h3>
+      {total === 0 ? <p className="chart-empty">لا توجد بيانات كافية</p> : (
+        <div className="donut-layout">
+          <svg aria-hidden="true" className="donut" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" fill="none" r={radius} stroke="#e7eef5" strokeWidth="18" />
+            {data.filter((item) => item.value > 0).map((item) => {
+              const dash = (item.value / total) * circumference
+              const segment = <circle cx="60" cy="60" fill="none" key={item.label} r={radius} stroke={item.color} strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={-offset} strokeLinecap="round" strokeWidth="18" />
+              offset += dash
+              return segment
+            })}
+            <text dominantBaseline="middle" textAnchor="middle" x="60" y="60">{total}</text>
+          </svg>
+          <div className="chart-legend">
+            {data.map((item) => <span key={item.label}><i style={{ background: item.color }} /> {item.label}: {item.value}</span>)}
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function ScoreBarsCard({ title, scores }: { title: string; scores: { label: string; value: number; max: number; color: string }[] }) {
+  return (
+    <article className="chart-card">
+      <h3>{title}</h3>
+      <div className="score-bars">
+        {scores.map((score) => (
+          <div className="score-bar" key={score.label}>
+            <span>{score.label}</span>
+            <div><i style={{ background: score.color, width: `${score.max ? (score.value / score.max) * 100 : 0}%` }} /></div>
+            <strong>{score.value}/{score.max}</strong>
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function YesNoSummaryCard({ title, items }: { title: string; items: { label: string; yes: number; no: number; total: number }[] }) {
+  return (
+    <article className="chart-card">
+      <h3>{title}</h3>
+      <div className="yes-no-summary">
+        {items.map((item) => {
+          const yesPercent = item.total ? Math.round((item.yes / item.total) * 100) : 0
+          return (
+            <div key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.total ? `${yesPercent}% نعم` : 'لا توجد بيانات'}</strong>
+              <div><i style={{ width: `${yesPercent}%` }} /></div>
+            </div>
+          )
+        })}
+      </div>
     </article>
   )
 }
@@ -1012,20 +1281,23 @@ function Info({ label, value }: { label: string; value: string }) {
 
 function CollegeView({ applicants, stats }: { applicants: Applicant[]; stats: { total: number; approved: number; pendingDocs: number; interviewed: number } }) {
   return (
-    <div className="grid two">
-      <section className="panel">
-        <div className="section-title"><h2>مراقبة سير العمل</h2><BarChart3 size={21} /></div>
-        <div className="progress-list">
-          <Progress label="استكمال التسجيل" value={Math.round((applicants.filter((a) => a.waitingNo).length / stats.total) * 100)} />
-          <Progress label="إنجاز المقابلات" value={Math.round((stats.interviewed / stats.total) * 100)} />
-          <Progress label="اعتماد النتائج" value={Math.round((stats.approved / stats.total) * 100)} />
-        </div>
-      </section>
-      <section className="panel">
-        <div className="section-title"><h2>تقرير تنفيذي سريع</h2><ListChecks size={21} /></div>
-        <ApplicantTable applicants={applicants} onSelect={() => undefined} />
-      </section>
-    </div>
+    <>
+      <VisualAnalyticsPanel applicants={applicants} />
+      <div className="grid two">
+        <section className="panel">
+          <div className="section-title"><h2>مراقبة سير العمل</h2><BarChart3 size={21} /></div>
+          <div className="progress-list">
+            <Progress label="استكمال التسجيل" value={stats.total ? Math.round((applicants.filter((a) => a.waitingNo).length / stats.total) * 100) : 0} />
+            <Progress label="إنجاز المقابلات" value={stats.total ? Math.round((stats.interviewed / stats.total) * 100) : 0} />
+            <Progress label="اعتماد النتائج" value={stats.total ? Math.round((stats.approved / stats.total) * 100) : 0} />
+          </div>
+        </section>
+        <section className="panel">
+          <div className="section-title"><h2>تقرير تنفيذي سريع</h2><ListChecks size={21} /></div>
+          <ApplicantTable applicants={applicants} onSelect={() => undefined} />
+        </section>
+      </div>
+    </>
   )
 }
 
@@ -1040,6 +1312,7 @@ function OperationsView({ applicants, selected, setSelectedId, approveDocuments,
     <div className="grid split">
       <section className="panel">
         <div className="section-title"><h2>قائمة المتقدمين</h2><UploadCloud size={21} /></div>
+        <VisualAnalyticsPanel applicants={applicants} mode="operations" />
         <div className="toolbar">
           <button type="button">استيراد من قبول</button>
           <button type="button">إنشاء رقم دفعة</button>
@@ -1084,6 +1357,7 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
     <div className="grid split">
       <section className="panel">
         <div className="section-title"><h2>اللجان والتوزيع</h2><Users size={21} /></div>
+        <VisualAnalyticsPanel applicants={applicants} mode="head" />
         <label className="list-select">
           اختيار اللجنة
           <select
@@ -1162,6 +1436,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
     return committeeNumber ? applicantCommitteeNumber === committeeNumber : false
   })
+  const analyticsApplicants = committeeNumber ? assigned : applicants
 
   useEffect(() => {
     setTranslatorId(committeeNumber ? selected.translatorId ?? '' : '')
@@ -1196,6 +1471,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     <div className="grid split">
       <section className="panel">
         <div className="section-title"><h2>المقابلات المسندة</h2><UserCheck size={21} /></div>
+        <VisualAnalyticsPanel applicants={analyticsApplicants} mode="committee" />
         <label className="list-select">
           اختيار اللجنة
           <select
