@@ -217,6 +217,14 @@ function formatManager(manager: CollegeManager) {
   return `${manager.title}: ${manager.name}`
 }
 
+function formatCommittee(committee: Committee) {
+  return `${committee.name} - ${committee.memberName}`
+}
+
+function formatStaffMember(member: StaffMember) {
+  return `${member.name} - ${member.computerNo ?? 'بدون رقم حاسب'} - ${member.task}`
+}
+
 function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager) {
   const rows = applicants.map((applicant) => [
     collegeProfile.collegeName,
@@ -632,7 +640,7 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="الجوال" value={applicant.phone} />
         <Info label="المؤهل" value={applicant.qualification} />
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
-        <Info label="اللجنة" value={committee ? `${committee.name} - ${committee.memberName}` : 'غير موزع'} />
+        <Info label="اللجنة" value={committee ? formatCommittee(committee) : 'غير موزع'} />
         <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
         <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 100`} />
       </div>
@@ -680,29 +688,6 @@ function CollegeView({ applicants, stats }: { applicants: Applicant[]; stats: { 
         <div className="section-title"><h2>تقرير تنفيذي سريع</h2><ListChecks size={21} /></div>
         <ApplicantTable applicants={applicants} onSelect={() => undefined} />
       </section>
-      <section className="panel staff-panel">
-        <div className="section-title"><h2>بيانات فرق العمل</h2><Users size={21} /></div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>الاسم</th>
-                <th>رقم الحاسب</th>
-                <th>المهام</th>
-              </tr>
-            </thead>
-            <tbody>
-              {staffMembers.map((member) => (
-                <tr key={member.id}>
-                  <td data-label="الاسم">{member.name}</td>
-                  <td data-label="رقم الحاسب">{member.computerNo ?? 'غير متوفر'}</td>
-                  <td data-label="المهام">{member.task}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   )
 }
@@ -746,14 +731,20 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
     <div className="grid split">
       <section className="panel">
         <div className="section-title"><h2>اللجان والتوزيع</h2><Users size={21} /></div>
-        <div className="committees">
-          {committees.map((committee) => (
-            <button aria-label={`${committee.name} - ${committee.memberName}`} key={committee.id} onClick={() => assignCommittee(selected.id, committee.id)} type="button">
-              <strong>{committee.name}</strong>
-              <span>{committee.memberName}</span>
-            </button>
-          ))}
-        </div>
+        <label className="list-select">
+          اختيار اللجنة
+          <select
+            aria-label="اختيار اللجنة"
+            value={selected.committeeId ?? ''}
+            onChange={(event) => event.target.value && assignCommittee(selected.id, event.target.value)}
+          >
+            <option value="">اختر رقم اللجنة والاسم</option>
+            {committees.map((committee) => (
+              <option key={committee.id} value={committee.id}>{formatCommittee(committee)}</option>
+            ))}
+          </select>
+        </label>
+        <StaffRosterList title="قائمة فرق العمل" />
         <ApplicantTable applicants={applicants} selectedId={selected.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
@@ -777,6 +768,8 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   submitEvaluation: (id: string) => void
 }) {
   const assigned = applicants.filter((applicant) => applicant.committeeId)
+  const [selectedStaffId, setSelectedStaffId] = useState(staffMembers[0].id)
+  const selectedStaff = staffMembers.find((member) => member.id === selectedStaffId) ?? staffMembers[0]
   const setScore = (key: keyof Applicant['scores'], value: number) => {
     updateApplicant(selected.id, { scores: { ...selected.scores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
   }
@@ -784,6 +777,19 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     <div className="grid split">
       <section className="panel">
         <div className="section-title"><h2>المقابلات المسندة</h2><UserCheck size={21} /></div>
+        <label className="list-select">
+          اختيار عضو اللجنة
+          <select aria-label="اختيار عضو اللجنة" value={selectedStaffId} onChange={(event) => setSelectedStaffId(event.target.value)}>
+            {staffMembers.map((member) => (
+              <option key={member.id} value={member.id}>{formatStaffMember(member)}</option>
+            ))}
+          </select>
+        </label>
+        <div className="detail-grid compact">
+          <Info label="الاسم" value={selectedStaff.name} />
+          <Info label="رقم الحاسب" value={selectedStaff.computerNo ?? 'غير متوفر'} />
+          <Info label="المهام" value={selectedStaff.task} />
+        </div>
         <ApplicantTable applicants={assigned} selectedId={selected.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
@@ -798,6 +804,28 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
           <button onClick={() => submitEvaluation(selected.id)} type="button"><CheckCircle2 size={17} /> اعتماد تقييم المتقدم</button>
         </div>
       </section>
+    </div>
+  )
+}
+
+function StaffRosterList({ title }: { title: string }) {
+  const [selectedStaffId, setSelectedStaffId] = useState(staffMembers[0].id)
+  const selectedStaff = staffMembers.find((member) => member.id === selectedStaffId) ?? staffMembers[0]
+  return (
+    <div className="staff-roster">
+      <label className="list-select">
+        {title}
+        <select aria-label={title} value={selectedStaffId} onChange={(event) => setSelectedStaffId(event.target.value)}>
+          {staffMembers.map((member) => (
+            <option key={member.id} value={member.id}>{formatStaffMember(member)}</option>
+          ))}
+        </select>
+      </label>
+      <div className="detail-grid compact">
+        <Info label="الاسم" value={selectedStaff.name} />
+        <Info label="رقم الحاسب" value={selectedStaff.computerNo ?? 'غير متوفر'} />
+        <Info label="المهام" value={selectedStaff.task} />
+      </div>
     </div>
   )
 }

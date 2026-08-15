@@ -201,6 +201,20 @@ button svg,
   font-weight: 700;
 }
 
+.list-select {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.staff-roster {
+  display: grid;
+  gap: 10px;
+}
+
 .quick-actions button,
 .toolbar button,
 .actions button,
@@ -540,6 +554,10 @@ tbody tr.selected {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.detail-grid.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .form-grid button {
@@ -933,6 +951,7 @@ textarea:focus {
 
   .metrics,
   .detail-grid,
+  .detail-grid.compact,
   .form-grid {
     grid-template-columns: 1fr;
   }

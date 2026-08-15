@@ -221,7 +221,7 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
     await user.click(screen.getByText('سلمان فهد المطيري'))
-    await user.click(screen.getByRole('button', { name: 'لجنة 2 - خالد عبدالعزيز المديفر' }))
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة'), 'c2')
 
     expect(screen.getAllByText('لجنة 2 - خالد عبدالعزيز المديفر').length).toBeGreaterThan(0)
     expect(screen.getByText('2026-08-18 11:00')).toBeTruthy()
@@ -233,6 +233,10 @@ describe('Interview management system', () => {
     render(<App />)
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
+    await user.selectOptions(screen.getByLabelText('اختيار عضو اللجنة'), 's3')
+    expect(screen.getByText('حسام الدين عثمان مسملي')).toBeTruthy()
+    expect(screen.getByText('28996')).toBeTruthy()
+    expect(screen.getByText('المنصة الإلكترونية للفرز')).toBeTruthy()
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
 
     const technical = screen.getByLabelText('المهارة التقنية')
