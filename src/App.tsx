@@ -52,6 +52,9 @@ type Applicant = {
   source: Source
   status: Status
   committeeId?: string
+  committeeNumber?: string
+  committeeTrainerIds?: string[]
+  translatorId?: string
   interviewAt?: string
   documents: { name: string; status: 'معتمد' | 'ناقص' | 'بانتظار المراجعة' }[]
   scores: { technical: number; communication: number; motivation: number }
@@ -62,9 +65,7 @@ type Applicant = {
 
 type Committee = {
   id: string
-  name: string
   number: string
-  memberName: string
 }
 
 type StaffMember = {
@@ -122,12 +123,9 @@ const staffMembers: StaffMember[] = [
 ]
 
 const committees: Committee[] = [
-  { id: 'c1', name: 'لجنة 1', number: '1', memberName: 'سالم سعيد الشمري' },
-  { id: 'c1-alt', name: 'لجنة 1', number: '1', memberName: 'دهام مخلف الشمري' },
-  { id: 'c2', name: 'لجنة 2', number: '2', memberName: 'خالد عبدالعزيز المديفر' },
-  { id: 'c2-alt', name: 'لجنة 2', number: '2', memberName: 'حسين صالح آل سنان' },
-  { id: 'c3', name: 'لجنة 3', number: '3', memberName: 'ماجد سعود الحربي' },
-  { id: 'c3-alt', name: 'لجنة 3', number: '3', memberName: 'إبراهيم علي النصار' },
+  { id: 'c1', number: '1' },
+  { id: 'c2', number: '2' },
+  { id: 'c3', number: '3' },
 ]
 
 export const seedApplicants: Applicant[] = [
@@ -143,6 +141,8 @@ export const seedApplicants: Applicant[] = [
     source: 'qobool',
     status: 'بانتظار المقابلة',
     committeeId: 'c1',
+    committeeNumber: '1',
+    committeeTrainerIds: ['s4', 's5'],
     interviewAt: '2026-08-18 09:30',
     documents: [
       { name: 'الهوية الوطنية', status: 'معتمد' },
@@ -184,6 +184,8 @@ export const seedApplicants: Applicant[] = [
     source: 'qobool',
     status: 'بانتظار اعتماد رئيس القسم',
     committeeId: 'c2',
+    committeeNumber: '2',
+    committeeTrainerIds: ['s6', 's7'],
     interviewAt: '2026-08-18 10:15',
     documents: [
       { name: 'الهوية الوطنية', status: 'معتمد' },
@@ -218,11 +220,22 @@ function formatManager(manager: CollegeManager) {
 }
 
 function formatCommittee(committee: Committee) {
-  return `${committee.name} - ${committee.memberName}`
+  return `لجنة ${committee.number}`
 }
 
 function formatStaffMember(member: StaffMember) {
   return `${member.name} - ${member.computerNo ?? 'بدون رقم حاسب'} - ${member.task}`
+}
+
+function staffNames(ids: string[] | undefined) {
+  return (ids ?? [])
+    .map((id) => staffMembers.find((member) => member.id === id)?.name)
+    .filter(Boolean)
+    .join('، ')
+}
+
+function translatorName(id: string | undefined) {
+  return id ? staffMembers.find((member) => member.id === id)?.name : undefined
 }
 
 function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager) {
@@ -423,11 +436,18 @@ function App() {
     )
   }
 
-  const assignCommittee = async (id: string, committeeId: string) => {
+  const assignCommittee = async (id: string, committeeNumber: string, committeeTrainerIds: string[], translatorId: string) => {
     await updateApplicant(
       id,
-      { committeeId, interviewAt: '2026-08-18 11:00', status: 'بانتظار المقابلة' },
-      'توزيع المتقدم على لجنة وموعد مقابلة',
+      {
+        committeeId: `c${committeeNumber}`,
+        committeeNumber,
+        committeeTrainerIds,
+        translatorId: translatorId || undefined,
+        interviewAt: '2026-08-18 11:00',
+        status: 'بانتظار المقابلة',
+      },
+      'توزيع المتقدم على لجنة ومدربين وموعد مقابلة',
     )
   }
 
@@ -625,6 +645,9 @@ function statusTone(status: Status) {
 
 function Details({ applicant }: { applicant: Applicant }) {
   const committee = committees.find((item) => item.id === applicant.committeeId)
+  const committeeNumber = applicant.committeeNumber ?? committee?.number
+  const trainers = staffNames(applicant.committeeTrainerIds)
+  const translator = translatorName(applicant.translatorId)
   return (
     <section className="details">
       <div className="profile-header">
@@ -640,7 +663,9 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="الجوال" value={applicant.phone} />
         <Info label="المؤهل" value={applicant.qualification} />
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
-        <Info label="اللجنة" value={committee ? formatCommittee(committee) : 'غير موزع'} />
+        <Info label="اللجنة" value={committeeNumber ? `لجنة ${committeeNumber}` : 'غير موزع'} />
+        <Info label="المدربون" value={trainers || 'لم يتم الاختيار'} />
+        <Info label="المترجم" value={translator ?? 'بدون مترجم'} />
         <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
         <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 100`} />
       </div>
@@ -724,9 +749,27 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
   applicants: Applicant[]
   selected: Applicant
   setSelectedId: (id: string) => void
-  assignCommittee: (id: string, committeeId: string) => void
+  assignCommittee: (id: string, committeeNumber: string, committeeTrainerIds: string[], translatorId: string) => void
   approveResult: (id: string) => void
 }) {
+  const initialCommitteeNumber = selected.committeeNumber ?? committees.find((committee) => committee.id === selected.committeeId)?.number ?? ''
+  const [committeeNumber, setCommitteeNumber] = useState(initialCommitteeNumber)
+  const [trainerIds, setTrainerIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
+  const [translatorId, setTranslatorId] = useState(selected.translatorId ?? '')
+  const trainers = staffMembers.filter((member) => member.task === `لجنة ${committeeNumber}`)
+  const translators = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
+
+  useEffect(() => {
+    const nextCommitteeNumber = selected.committeeNumber ?? committees.find((committee) => committee.id === selected.committeeId)?.number ?? ''
+    setCommitteeNumber(nextCommitteeNumber)
+    setTrainerIds(selected.committeeTrainerIds ?? [])
+    setTranslatorId(selected.translatorId ?? '')
+  }, [selected.id, selected.committeeId, selected.committeeNumber, selected.committeeTrainerIds, selected.translatorId])
+
+  const toggleTrainer = (id: string) => {
+    setTrainerIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  }
+
   return (
     <div className="grid split">
       <section className="panel">
@@ -735,16 +778,49 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
           اختيار اللجنة
           <select
             aria-label="اختيار اللجنة"
-            value={selected.committeeId ?? ''}
-            onChange={(event) => event.target.value && assignCommittee(selected.id, event.target.value)}
+            value={committeeNumber}
+            onChange={(event) => {
+              setCommitteeNumber(event.target.value)
+              setTrainerIds([])
+              setTranslatorId('')
+            }}
           >
-            <option value="">اختر رقم اللجنة والاسم</option>
+            <option value="">اختر رقم اللجنة</option>
             {committees.map((committee) => (
-              <option key={committee.id} value={committee.id}>{formatCommittee(committee)}</option>
+              <option key={committee.id} value={committee.number}>{formatCommittee(committee)}</option>
             ))}
           </select>
         </label>
-        <StaffRosterList title="قائمة فرق العمل" />
+        {committeeNumber && (
+          <div className="choice-block">
+            <strong>اختيار المدربين</strong>
+            <div className="check-list">
+              {trainers.map((trainer) => (
+                <label className="check-item" key={trainer.id}>
+                  <input checked={trainerIds.includes(trainer.id)} onChange={() => toggleTrainer(trainer.id)} type="checkbox" />
+                  <span>{trainer.name}</span>
+                  <small>{trainer.computerNo ?? 'بدون رقم حاسب'}</small>
+                </label>
+              ))}
+            </div>
+            <label className="list-select">
+              اختيار مترجم اختياري
+              <select aria-label="اختيار مترجم اختياري" value={translatorId} onChange={(event) => setTranslatorId(event.target.value)}>
+                <option value="">بدون مترجم</option>
+                {translators.map((translator) => (
+                  <option key={translator.id} value={translator.id}>{formatStaffMember(translator)}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="full-action"
+              onClick={() => assignCommittee(selected.id, committeeNumber, trainerIds, translatorId)}
+              type="button"
+            >
+              تثبيت اللجنة والمدربين
+            </button>
+          </div>
+        )}
         <ApplicantTable applicants={applicants} selectedId={selected.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
@@ -804,28 +880,6 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
           <button onClick={() => submitEvaluation(selected.id)} type="button"><CheckCircle2 size={17} /> اعتماد تقييم المتقدم</button>
         </div>
       </section>
-    </div>
-  )
-}
-
-function StaffRosterList({ title }: { title: string }) {
-  const [selectedStaffId, setSelectedStaffId] = useState(staffMembers[0].id)
-  const selectedStaff = staffMembers.find((member) => member.id === selectedStaffId) ?? staffMembers[0]
-  return (
-    <div className="staff-roster">
-      <label className="list-select">
-        {title}
-        <select aria-label={title} value={selectedStaffId} onChange={(event) => setSelectedStaffId(event.target.value)}>
-          {staffMembers.map((member) => (
-            <option key={member.id} value={member.id}>{formatStaffMember(member)}</option>
-          ))}
-        </select>
-      </label>
-      <div className="detail-grid compact">
-        <Info label="الاسم" value={selectedStaff.name} />
-        <Info label="رقم الحاسب" value={selectedStaff.computerNo ?? 'غير متوفر'} />
-        <Info label="المهام" value={selectedStaff.task} />
-      </div>
     </div>
   )
 }

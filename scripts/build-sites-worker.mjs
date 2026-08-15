@@ -50,6 +50,8 @@ const seedApplicants = [
     source: 'qobool',
     status: 'بانتظار المقابلة',
     committeeId: 'c1',
+    committeeNumber: '1',
+    committeeTrainerIds: ['s4', 's5'],
     interviewAt: '2026-08-18 09:30',
     documents: [
       { name: 'الهوية الوطنية', status: 'معتمد' },
@@ -91,6 +93,8 @@ const seedApplicants = [
     source: 'qobool',
     status: 'بانتظار اعتماد رئيس القسم',
     committeeId: 'c2',
+    committeeNumber: '2',
+    committeeTrainerIds: ['s6', 's7'],
     interviewAt: '2026-08-18 10:15',
     documents: [
       { name: 'الهوية الوطنية', status: 'معتمد' },
@@ -118,6 +122,9 @@ const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   source TEXT NOT NULL,
   status TEXT NOT NULL,
   committee_id TEXT,
+  committee_number TEXT,
+  committee_trainers_json TEXT,
+  translator_id TEXT,
   interview_at TEXT,
   documents_json TEXT NOT NULL,
   scores_json TEXT NOT NULL,
@@ -131,6 +138,11 @@ const indexSql = [
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_national_id ON applicants (national_id)',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_request_no ON applicants (request_no)',
   'CREATE INDEX IF NOT EXISTS idx_applicants_status ON applicants (status)',
+];
+const migrationSql = [
+  'ALTER TABLE applicants ADD COLUMN committee_number TEXT',
+  'ALTER TABLE applicants ADD COLUMN committee_trainers_json TEXT',
+  'ALTER TABLE applicants ADD COLUMN translator_id TEXT',
 ];
 
 function decodeBase64(value) {
@@ -190,6 +202,9 @@ function rowToApplicant(row) {
     source: row.source,
     status: row.status,
     committeeId: row.committee_id || undefined,
+    committeeNumber: row.committee_number || undefined,
+    committeeTrainerIds: row.committee_trainers_json ? JSON.parse(row.committee_trainers_json) : undefined,
+    translatorId: row.translator_id || undefined,
     interviewAt: row.interview_at || undefined,
     documents: JSON.parse(row.documents_json),
     scores: JSON.parse(row.scores_json),
@@ -202,9 +217,9 @@ function rowToApplicant(row) {
 function insertApplicantStatement(db, applicant) {
   return db.prepare(\`INSERT OR IGNORE INTO applicants (
     id, national_id, request_no, waiting_no, name, phone, qualification, gpa,
-    source, status, committee_id, interview_at, documents_json, scores_json,
-    notes, final_result, audit_json
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`).bind(
+    source, status, committee_id, committee_number, committee_trainers_json,
+    translator_id, interview_at, documents_json, scores_json, notes, final_result, audit_json
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`).bind(
     applicant.id,
     applicant.nationalId,
     applicant.requestNo,
@@ -216,6 +231,9 @@ function insertApplicantStatement(db, applicant) {
     applicant.source,
     applicant.status,
     applicant.committeeId || null,
+    applicant.committeeNumber || null,
+    applicant.committeeTrainerIds ? JSON.stringify(applicant.committeeTrainerIds) : null,
+    applicant.translatorId || null,
     applicant.interviewAt || null,
     JSON.stringify(applicant.documents),
     JSON.stringify(applicant.scores),
@@ -233,6 +251,13 @@ async function ensureDb(env) {
     ...indexSql.map((statement) => db.prepare(statement)),
     db.prepare('PRAGMA optimize'),
   ]);
+  for (const statement of migrationSql) {
+    try {
+      await db.prepare(statement).run();
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('duplicate column')) throw error;
+    }
+  }
   const count = await db.prepare('SELECT COUNT(*) AS total FROM applicants').first();
   if ((count?.total ?? 0) === 0) {
     await db.batch(seedApplicants.map((applicant) => insertApplicantStatement(db, applicant)));
@@ -263,6 +288,7 @@ async function createApplicant(env, request) {
     gpa: Number(body.gpa),
     source: 'direct',
     status: 'بانتظار مراجعة شؤون المتدربين',
+    committeeTrainerIds: [],
     documents: [
       { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
       { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
@@ -296,6 +322,9 @@ async function updateApplicant(env, request, id) {
     source = ?,
     status = ?,
     committee_id = ?,
+    committee_number = ?,
+    committee_trainers_json = ?,
+    translator_id = ?,
     interview_at = ?,
     documents_json = ?,
     scores_json = ?,
@@ -312,6 +341,9 @@ async function updateApplicant(env, request, id) {
       next.source,
       next.status,
       next.committeeId || null,
+      next.committeeNumber || null,
+      next.committeeTrainerIds ? JSON.stringify(next.committeeTrainerIds) : null,
+      next.translatorId || null,
       next.interviewAt || null,
       JSON.stringify(next.documents),
       JSON.stringify(next.scores),

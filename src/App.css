@@ -215,6 +215,59 @@ button svg,
   gap: 10px;
 }
 
+.choice-block {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+
+.choice-block > strong {
+  color: var(--color-text-primary);
+}
+
+.check-list {
+  display: grid;
+  gap: 8px;
+}
+
+.check-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e2e8ef;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.check-item input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--color-action-primary);
+}
+
+.check-item span,
+.check-item small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.check-item small {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.full-action {
+  min-height: 42px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-inverse);
+  background: var(--color-action-primary);
+}
+
 .quick-actions button,
 .toolbar button,
 .actions button,

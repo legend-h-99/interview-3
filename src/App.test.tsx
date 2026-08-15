@@ -221,9 +221,15 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
     await user.click(screen.getByText('سلمان فهد المطيري'))
-    await user.selectOptions(screen.getByLabelText('اختيار اللجنة'), 'c2')
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة'), '2')
+    await user.click(screen.getByLabelText(/خالد عبدالعزيز المديفر/))
+    await user.click(screen.getByLabelText(/حسين صالح آل سنان/))
+    await user.selectOptions(screen.getByLabelText('اختيار مترجم اختياري'), 's10')
+    await user.click(screen.getByRole('button', { name: 'تثبيت اللجنة والمدربين' }))
 
-    expect(screen.getAllByText('لجنة 2 - خالد عبدالعزيز المديفر').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('لجنة 2').length).toBeGreaterThan(0)
+    expect(screen.getByText('خالد عبدالعزيز المديفر، حسين صالح آل سنان')).toBeTruthy()
+    expect(screen.getByText('عبدالله محمد الفيفي')).toBeTruthy()
     expect(screen.getByText('2026-08-18 11:00')).toBeTruthy()
     expect(screen.getAllByText('بانتظار المقابلة').length).toBeGreaterThan(0)
   })
