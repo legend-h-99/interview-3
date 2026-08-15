@@ -147,6 +147,7 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'committee', label: 'لجان المقابلات', icon: UserCheck },
   { id: 'applicant', label: 'واجهة المتقدم', icon: QrCode },
 ]
+const roleIds = roles.map((item) => item.id)
 
 const roleDescriptions: Record<Role, string> = {
   college: 'نظرة تنفيذية على سير المقابلات، نسب الإنجاز، والنتائج المعتمدة.',
@@ -583,8 +584,11 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
 }
 
 function App() {
-  const applicantOnly = new URLSearchParams(window.location.search).get('view') === 'applicant'
-  const [role, setRole] = useState<Role>(applicantOnly ? 'applicant' : 'trainees')
+  const searchParams = new URLSearchParams(window.location.search)
+  const applicantOnly = searchParams.get('view') === 'applicant'
+  const requestedRole = searchParams.get('role') as Role | null
+  const initialRole = requestedRole && roleIds.includes(requestedRole) ? requestedRole : 'trainees'
+  const [role, setRole] = useState<Role>(applicantOnly ? 'applicant' : initialRole)
   const [applicants, setApplicants] = useState<Applicant[]>(seedApplicants)
   const [selectedId, setSelectedId] = useState(seedApplicants[0].id)
   const [selectedManagerIndex, setSelectedManagerIndex] = useState(0)
@@ -735,6 +739,14 @@ function App() {
     setSelectedId(seedApplicants[0].id)
   }
 
+  const navigateRole = (nextRole: Role) => {
+    setRole(nextRole)
+    const nextUrl = new URL(window.location.href)
+    nextUrl.searchParams.delete('view')
+    nextUrl.searchParams.set('role', nextRole)
+    window.history.replaceState(null, '', nextUrl)
+  }
+
   return (
     <main className="app" dir="rtl">
       {!applicantOnly && <aside className="sidebar">
@@ -749,7 +761,7 @@ function App() {
           {roles.map((item) => {
             const Icon = item.icon
             return (
-              <button className={role === item.id ? 'active' : ''} key={item.id} onClick={() => setRole(item.id)} type="button">
+              <button className={role === item.id ? 'active' : ''} key={item.id} onClick={() => navigateRole(item.id)} type="button">
                 <Icon size={18} />
                 {item.label}
               </button>

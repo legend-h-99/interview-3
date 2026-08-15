@@ -120,6 +120,14 @@ describe('Interview management system', () => {
     expect(screen.queryByRole('button', { name: 'شؤون المتدربين' })).toBeNull()
   })
 
+  it('opens internal pages directly from the role query parameter', () => {
+    window.history.pushState({}, '', '/?role=head')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'رئيس القسم' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'رئيس القسم' }).className).toContain('active')
+  })
+
   it('exports applicants and college identity to an Excel-compatible CSV file', async () => {
     const user = userEvent.setup()
     const createObjectUrl = vi.fn(() => 'blob:interview-3-export')
