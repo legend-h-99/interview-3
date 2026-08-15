@@ -239,10 +239,13 @@ describe('Interview management system', () => {
     render(<App />)
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
-    await user.selectOptions(screen.getByLabelText('اختيار عضو اللجنة'), 's3')
-    expect(screen.getByText('حسام الدين عثمان مسملي')).toBeTruthy()
-    expect(screen.getByText('28996')).toBeTruthy()
-    expect(screen.getByText('المنصة الإلكترونية للفرز')).toBeTruthy()
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
+    await user.selectOptions(screen.getByLabelText('اختيار اسم المدرب'), 's4')
+    await user.selectOptions(screen.getByLabelText('اختيار مترجم المقابلة اختياري'), 's10')
+    expect(screen.getByText('سالم سعيد الشمري')).toBeTruthy()
+    expect(screen.getByText('27548')).toBeTruthy()
+    expect(screen.getAllByText('لجنة 1').length).toBeGreaterThan(0)
+    expect(screen.getByText('عبدالله محمد الفيفي')).toBeTruthy()
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
 
     const technical = screen.getByLabelText('المهارة التقنية')
