@@ -149,6 +149,34 @@ function json(data, init = {}) {
   });
 }
 
+const allowedOrigins = new Set([
+  'https://legend-h-99.github.io',
+  'https://interviews-tech-system.hossam-a-m22.chatgpt.site',
+]);
+
+function corsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://legend-h-99.github.io',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+}
+
+function withCors(response, request) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(corsHeaders(request))) {
+    headers.set(key, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function rowToApplicant(row) {
   return {
     id: row.id,
@@ -306,20 +334,24 @@ async function resetApplicants(env) {
 async function handleApi(request, env) {
   try {
     const url = new URL(request.url);
-    if (url.pathname === '/api/applicants' && request.method === 'GET') return listApplicants(env);
-    if (url.pathname === '/api/applicants' && request.method === 'POST') return createApplicant(env, request);
+    let response;
+    if (url.pathname === '/api/applicants' && request.method === 'GET') response = await listApplicants(env);
+    if (url.pathname === '/api/applicants' && request.method === 'POST') response = await createApplicant(env, request);
     const match = url.pathname.match(/^\\/api\\/applicants\\/([^/]+)$/);
-    if (match && request.method === 'PATCH') return updateApplicant(env, request, match[1]);
-    if (url.pathname === '/api/reset' && request.method === 'POST') return resetApplicants(env);
-    return json({ error: 'Not found' }, { status: 404 });
+    if (!response && match && request.method === 'PATCH') response = await updateApplicant(env, request, match[1]);
+    if (!response && url.pathname === '/api/reset' && request.method === 'POST') response = await resetApplicants(env);
+    return withCors(response || json({ error: 'Not found' }, { status: 404 }), request);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 });
+    return withCors(json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 }), request);
   }
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
+    }
     if (url.pathname.startsWith('/api/')) return handleApi(request, env);
     const asset = files.get(url.pathname) || files.get('/index.html');
     return new Response(decodeBase64(asset.body), {
