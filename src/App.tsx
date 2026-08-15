@@ -46,7 +46,12 @@ type Applicant = {
   requestNo: string
   waitingNo?: string
   name: string
+  nationality: string
+  age: number
+  certificateType: string
+  graduationDate: string
   phone: string
+  extraPhone: string
   qualification: string
   gpa: number
   source: Source
@@ -139,7 +144,12 @@ export const seedApplicants: Applicant[] = [
     requestNo: 'REQ-2026-0001',
     waitingNo: 'W-014',
     name: 'عبدالله محمد الزهراني',
+    nationality: 'سعودي',
+    age: 19,
+    certificateType: 'ثانوية عامة',
+    graduationDate: '2026-06-15',
     phone: '0551234567',
+    extraPhone: '0557654321',
     qualification: 'ثانوية عامة - مسار علمي',
     gpa: 93.4,
     source: 'qobool',
@@ -162,7 +172,12 @@ export const seedApplicants: Applicant[] = [
     nationalId: '1023456789',
     requestNo: 'REQ-2026-0002',
     name: 'سلمان فهد المطيري',
+    nationality: 'سعودي',
+    age: 22,
+    certificateType: 'دبلوم حاسب',
+    graduationDate: '2025-05-20',
     phone: '0569001122',
+    extraPhone: '0569003344',
     qualification: 'دبلوم حاسب',
     gpa: 88.2,
     source: 'direct',
@@ -182,7 +197,12 @@ export const seedApplicants: Applicant[] = [
     requestNo: 'REQ-2026-0003',
     waitingNo: 'W-008',
     name: 'رائد علي الشهري',
+    nationality: 'سعودي',
+    age: 20,
+    certificateType: 'ثانوية صناعية',
+    graduationDate: '2026-06-10',
     phone: '0503332211',
+    extraPhone: '0503332244',
     qualification: 'ثانوية صناعية',
     gpa: 91.7,
     source: 'qobool',
@@ -211,7 +231,7 @@ const questions = [
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
@@ -252,9 +272,12 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
     applicant.requestNo,
     applicant.name,
     applicant.nationalId,
+    applicant.nationality,
+    applicant.age,
+    applicant.certificateType,
+    applicant.graduationDate,
     applicant.phone,
-    applicant.qualification,
-    applicant.gpa,
+    applicant.extraPhone,
     applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر',
     applicant.status,
     applicant.waitingNo ?? '',
@@ -297,9 +320,14 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
       <td>${escapeHtml(applicant.requestNo)}</td>
       <td>${escapeHtml(applicant.name)}</td>
       <td>${escapeHtml(applicant.nationalId)}</td>
+      <td>${escapeHtml(applicant.nationality)}</td>
+      <td>${escapeHtml(applicant.age)}</td>
+      <td>${escapeHtml(applicant.certificateType)}</td>
+      <td>${escapeHtml(applicant.graduationDate)}</td>
+      <td>${escapeHtml(applicant.phone)}</td>
+      <td>${escapeHtml(applicant.extraPhone)}</td>
       <td>${escapeHtml(applicant.status)}</td>
       <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
-      <td>${escapeHtml(applicant.gpa)}%</td>
     </tr>
   `).join('')
 
@@ -348,7 +376,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         </section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم الانتظار</th><th>المعدل</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الجنسية</th><th>العمر</th><th>نوع الشهادة</th><th>تاريخ التخرج</th><th>رقم الجوال</th><th>رقم جوال إضافي</th><th>الحالة</th><th>رقم الانتظار</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -383,9 +411,12 @@ function App() {
   const [nationalId, setNationalId] = useState('')
   const [form, setForm] = useState({
     name: '',
+    nationality: 'سعودي',
+    age: '',
+    certificateType: '',
+    graduationDate: '',
     phone: '',
-    qualification: '',
-    gpa: '90',
+    extraPhone: '',
   })
 
   const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
@@ -473,9 +504,14 @@ function App() {
       body: JSON.stringify({
         nationalId,
         name: form.name,
+        nationality: form.nationality,
+        age: Number(form.age),
+        certificateType: form.certificateType,
+        graduationDate: form.graduationDate,
         phone: form.phone,
-        qualification: form.qualification,
-        gpa: Number(form.gpa),
+        extraPhone: form.extraPhone,
+        qualification: form.certificateType,
+        gpa: 0,
       }),
     })
     if (response.ok) {
@@ -620,10 +656,11 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
           <tr>
             <th>رقم الطلب</th>
             <th>المتقدم</th>
-            <th>المصدر</th>
+            <th>رقم الهوية</th>
+            <th>الجنسية</th>
             <th>الحالة</th>
             <th>رقم الانتظار</th>
-            <th>المعدل</th>
+            <th>نوع الشهادة</th>
           </tr>
         </thead>
         <tbody>
@@ -631,10 +668,11 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
             <tr className={selectedId === applicant.id ? 'selected' : ''} key={applicant.id} onClick={() => onSelect(applicant.id)}>
               <td data-label="رقم الطلب">{applicant.requestNo}</td>
               <td data-label="المتقدم">{applicant.name}</td>
-              <td data-label="المصدر">{applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</td>
+              <td data-label="رقم الهوية">{applicant.nationalId}</td>
+              <td data-label="الجنسية">{applicant.nationality}</td>
               <td data-label="الحالة"><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
               <td data-label="رقم الانتظار">{applicant.waitingNo ?? 'لم يصدر'}</td>
-              <td data-label="المعدل">{applicant.gpa}%</td>
+              <td data-label="نوع الشهادة">{applicant.certificateType}</td>
             </tr>
           ))}
         </tbody>
@@ -667,8 +705,12 @@ function Details({ applicant }: { applicant: Applicant }) {
       </div>
       <div className="detail-grid">
         <Info label="رقم الهوية" value={applicant.nationalId} />
-        <Info label="الجوال" value={applicant.phone} />
-        <Info label="المؤهل" value={applicant.qualification} />
+        <Info label="الجنسية" value={applicant.nationality} />
+        <Info label="العمر" value={`${applicant.age}`} />
+        <Info label="نوع الشهادة" value={applicant.certificateType} />
+        <Info label="تاريخ التخرج" value={applicant.graduationDate} />
+        <Info label="رقم الجوال" value={applicant.phone} />
+        <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
         <Info label="اللجنة" value={committeeNumber ? `لجنة ${committeeNumber}` : 'غير موزع'} />
         <Info label="المدربون" value={trainers || 'لم يتم الاختيار'} />
@@ -971,8 +1013,8 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
   applicants: Applicant[]
   nationalId: string
   setNationalId: (value: string) => void
-  form: { name: string; phone: string; qualification: string; gpa: string }
-  setForm: (value: { name: string; phone: string; qualification: string; gpa: string }) => void
+  form: { name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }
+  setForm: (value: { name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }) => void
   registerApplicant: () => void
 }) {
   const found = applicants.find((item) => item.nationalId === nationalId)
@@ -1001,9 +1043,12 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
         ) : (
           <div className="form-grid">
             <label>الاسم الكامل<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+            <label>الجنسية<input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} /></label>
+            <label>العمر<input inputMode="numeric" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></label>
+            <label>نوع الشهادة<input value={form.certificateType} onChange={(event) => setForm({ ...form, certificateType: event.target.value })} /></label>
+            <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
             <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
-            <label>المؤهل<input value={form.qualification} onChange={(event) => setForm({ ...form, qualification: event.target.value })} /></label>
-            <label>المعدل<input value={form.gpa} onChange={(event) => setForm({ ...form, gpa: event.target.value })} /></label>
+            <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
             <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> رفع الوثائق وتأكيد الإقرار</button>
           </div>
         )}

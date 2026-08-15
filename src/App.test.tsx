@@ -30,9 +30,14 @@ beforeEach(() => {
         nationalId: body.nationalId,
         requestNo: `REQ-2026-${String(apiApplicants.length + 1).padStart(4, '0')}`,
         name: body.name,
+        nationality: body.nationality,
+        age: Number(body.age),
+        certificateType: body.certificateType,
+        graduationDate: body.graduationDate,
         phone: body.phone,
-        qualification: body.qualification,
-        gpa: Number(body.gpa),
+        extraPhone: body.extraPhone,
+        qualification: body.qualification || body.certificateType,
+        gpa: Number(body.gpa || 0),
         source: 'direct' as const,
         status: 'بانتظار مراجعة شؤون المتدربين' as const,
         documents: [
@@ -88,14 +93,18 @@ describe('Interview management system', () => {
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'واجهة المتقدم' }))
     await user.type(screen.getByLabelText('رقم الهوية الوطنية'), '1099999999')
     await user.type(screen.getByLabelText('الاسم الكامل'), 'مازن صالح القحطاني')
+    await user.clear(screen.getByLabelText('الجنسية'))
+    await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
+    await user.type(screen.getByLabelText('العمر'), '21')
+    await user.type(screen.getByLabelText('نوع الشهادة'), 'ثانوية عامة')
+    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
     await user.type(screen.getByLabelText('رقم الجوال'), '0557778888')
-    await user.type(screen.getByLabelText('المؤهل'), 'ثانوية عامة')
-    await user.clear(screen.getByLabelText('المعدل'))
-    await user.type(screen.getByLabelText('المعدل'), '96')
+    await user.type(screen.getByLabelText('رقم جوال إضافي'), '0557779999')
     await user.click(screen.getByRole('button', { name: /رفع الوثائق/ }))
 
     expect(await screen.findByText('مازن صالح القحطاني')).toBeTruthy()
     expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
+    expect(screen.getByText('0557779999')).toBeTruthy()
     expect(screen.getByText('بانتظار مراجعة شؤون المتدربين')).toBeTruthy()
   })
 
@@ -167,10 +176,13 @@ describe('Interview management system', () => {
 
     await user.type(screen.getByLabelText('رقم الهوية الوطنية'), '1088888888')
     await user.type(screen.getByLabelText('الاسم الكامل'), 'تركي ناصر الحربي')
+    await user.clear(screen.getByLabelText('الجنسية'))
+    await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
+    await user.type(screen.getByLabelText('العمر'), '20')
+    await user.type(screen.getByLabelText('نوع الشهادة'), 'ثانوية عامة')
+    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-05-30')
     await user.type(screen.getByLabelText('رقم الجوال'), '0551112222')
-    await user.type(screen.getByLabelText('المؤهل'), 'ثانوية عامة')
-    await user.clear(screen.getByLabelText('المعدل'))
-    await user.type(screen.getByLabelText('المعدل'), '94')
+    await user.type(screen.getByLabelText('رقم جوال إضافي'), '0551113333')
     await user.click(screen.getByRole('button', { name: /رفع الوثائق/ }))
 
     expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
