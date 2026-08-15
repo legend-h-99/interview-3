@@ -63,8 +63,15 @@ type Applicant = {
 type Committee = {
   id: string
   name: string
-  room: string
-  members: string[]
+  number: string
+  memberName: string
+}
+
+type StaffMember = {
+  id: string
+  name: string
+  computerNo?: string
+  task: string
 }
 
 type CollegeManager = {
@@ -100,10 +107,27 @@ const roleDescriptions: Record<Role, string> = {
   applicant: 'تسجيل طلب جديد أو متابعة حالة الطلب برقم الهوية.',
 }
 
+const staffMembers: StaffMember[] = [
+  { id: 's1', name: 'رائد عبدالعزيز الغفيلي', computerNo: '30487', task: 'رئيس اللجنة' },
+  { id: 's2', name: 'موسى عبدالرحيم الأنصاري', computerNo: '30004', task: 'المنصة الإلكترونية للفرز' },
+  { id: 's3', name: 'حسام الدين عثمان مسملي', computerNo: '28996', task: 'المنصة الإلكترونية للفرز' },
+  { id: 's4', name: 'سالم سعيد الشمري', computerNo: '27548', task: 'لجنة 1' },
+  { id: 's5', name: 'دهام مخلف الشمري', computerNo: '23294', task: 'لجنة 1' },
+  { id: 's6', name: 'خالد عبدالعزيز المديفر', computerNo: '31067', task: 'لجنة 2' },
+  { id: 's7', name: 'حسين صالح آل سنان', computerNo: '26596', task: 'لجنة 2' },
+  { id: 's8', name: 'ماجد سعود الحربي', computerNo: '16712', task: 'لجنة 3' },
+  { id: 's9', name: 'إبراهيم علي النصار', task: 'لجنة 3' },
+  { id: 's10', name: 'عبدالله محمد الفيفي', computerNo: '30593', task: 'التنظيم والترجمة' },
+  { id: 's11', name: 'سطام عبدالعزيز الفهيد', computerNo: '21286', task: 'التنظيم والترجمة' },
+]
+
 const committees: Committee[] = [
-  { id: 'c1', name: 'لجنة المقابلات الأولى', room: 'قاعة 203', members: ['م. أحمد سالم', 'م. نورة الحربي'] },
-  { id: 'c2', name: 'لجنة المقابلات الثانية', room: 'قاعة 207', members: ['م. خالد العتيبي', 'م. سارة الشهري'] },
-  { id: 'c3', name: 'لجنة الوثائق والدعم', room: 'مكتب القبول', members: ['أ. ريم القحطاني', 'أ. محمد الغامدي'] },
+  { id: 'c1', name: 'لجنة 1', number: '1', memberName: 'سالم سعيد الشمري' },
+  { id: 'c1-alt', name: 'لجنة 1', number: '1', memberName: 'دهام مخلف الشمري' },
+  { id: 'c2', name: 'لجنة 2', number: '2', memberName: 'خالد عبدالعزيز المديفر' },
+  { id: 'c2-alt', name: 'لجنة 2', number: '2', memberName: 'حسين صالح آل سنان' },
+  { id: 'c3', name: 'لجنة 3', number: '3', memberName: 'ماجد سعود الحربي' },
+  { id: 'c3-alt', name: 'لجنة 3', number: '3', memberName: 'إبراهيم علي النصار' },
 ]
 
 export const seedApplicants: Applicant[] = [
@@ -182,6 +206,7 @@ const questions = [
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
 const exportHeaders = ['اسم الكلية', 'القسم', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
+const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
   const text = String(value ?? '')
@@ -210,7 +235,14 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
     applicant.interviewAt ?? '',
     applicant.finalResult ?? '',
   ])
-  const csv = [exportHeaders, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')
+  const staffRows = staffMembers.map((member) => [member.name, member.computerNo ?? '', member.task])
+  const csv = [
+    'بيانات المتقدمين',
+    [exportHeaders, ...rows].map((row) => row.map(csvCell).join(',')).join('\n'),
+    '',
+    'بيانات فرق العمل',
+    [staffExportHeaders, ...staffRows].map((row) => row.map(csvCell).join(',')).join('\n'),
+  ].join('\n')
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
@@ -292,6 +324,21 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
             <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم الانتظار</th><th>المعدل</th></tr>
           </thead>
           <tbody>${rows}</tbody>
+        </table>
+        <h2>بيانات فرق العمل</h2>
+        <table>
+          <thead>
+            <tr><th>الاسم</th><th>رقم الحاسب</th><th>المهام</th></tr>
+          </thead>
+          <tbody>
+            ${staffMembers.map((member) => `
+              <tr>
+                <td>${escapeHtml(member.name)}</td>
+                <td>${escapeHtml(member.computerNo ?? '')}</td>
+                <td>${escapeHtml(member.task)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
         </table>
         <script>window.addEventListener('load', () => window.print());</script>
       </body>
@@ -585,7 +632,7 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="الجوال" value={applicant.phone} />
         <Info label="المؤهل" value={applicant.qualification} />
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
-        <Info label="اللجنة" value={committee?.name ?? 'غير موزع'} />
+        <Info label="اللجنة" value={committee ? `${committee.name} - ${committee.memberName}` : 'غير موزع'} />
         <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
         <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 100`} />
       </div>
@@ -633,6 +680,29 @@ function CollegeView({ applicants, stats }: { applicants: Applicant[]; stats: { 
         <div className="section-title"><h2>تقرير تنفيذي سريع</h2><ListChecks size={21} /></div>
         <ApplicantTable applicants={applicants} onSelect={() => undefined} />
       </section>
+      <section className="panel staff-panel">
+        <div className="section-title"><h2>بيانات فرق العمل</h2><Users size={21} /></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الاسم</th>
+                <th>رقم الحاسب</th>
+                <th>المهام</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staffMembers.map((member) => (
+                <tr key={member.id}>
+                  <td data-label="الاسم">{member.name}</td>
+                  <td data-label="رقم الحاسب">{member.computerNo ?? 'غير متوفر'}</td>
+                  <td data-label="المهام">{member.task}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
@@ -678,9 +748,9 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
         <div className="section-title"><h2>اللجان والتوزيع</h2><Users size={21} /></div>
         <div className="committees">
           {committees.map((committee) => (
-            <button key={committee.id} onClick={() => assignCommittee(selected.id, committee.id)} type="button">
+            <button aria-label={`${committee.name} - ${committee.memberName}`} key={committee.id} onClick={() => assignCommittee(selected.id, committee.id)} type="button">
               <strong>{committee.name}</strong>
-              <span>{committee.room} - {committee.members.join('، ')}</span>
+              <span>{committee.memberName}</span>
             </button>
           ))}
         </div>
