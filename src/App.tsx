@@ -206,7 +206,7 @@ function escapeHtml(value: string | number | undefined) {
 }
 
 function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }) {
-  const report = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=720')
+  const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
 
   const rows = applicants.map((applicant) => `
