@@ -133,7 +133,8 @@ button {
 }
 
 .topbar p,
-.topbar h1 {
+.topbar h1,
+.topbar-description {
   margin: 0;
 }
 
@@ -146,6 +147,15 @@ button {
   font-size: 30px;
   line-height: 1.2;
   letter-spacing: 0;
+}
+
+.topbar-description {
+  display: block;
+  max-width: 620px;
+  margin-top: 7px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .quick-actions {
@@ -203,10 +213,46 @@ button {
   background: var(--color-bg-surface);
   box-shadow: var(--shadow-card);
   min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-action-primary);
 }
 
 .metric svg {
   color: var(--color-action-primary);
+}
+
+.metric.amber::before {
+  background: var(--color-status-warning-text);
+}
+
+.metric.amber svg {
+  color: var(--color-status-warning-text);
+}
+
+.metric.teal::before {
+  background: #0f766e;
+}
+
+.metric.teal svg {
+  color: #0f766e;
+}
+
+.metric.green::before {
+  background: var(--color-status-success-text);
+}
+
+.metric.green svg {
+  color: var(--color-status-success-text);
 }
 
 .metric span {
@@ -218,6 +264,44 @@ button {
 .metric strong {
   margin-inline-start: auto;
   font-size: clamp(24px, 2.1vw, 30px);
+}
+
+.insight-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: -4px 0 18px;
+}
+
+.insight-strip div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #dce5ed;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: rgb(255 255 255 / 0.68);
+  backdrop-filter: blur(12px);
+}
+
+.insight-strip svg {
+  flex: 0 0 auto;
+  color: var(--color-action-primary);
+}
+
+.insight-strip span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.insight-strip strong {
+  margin-inline-start: auto;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .grid {
@@ -349,6 +433,53 @@ tbody tr.selected {
 .details {
   display: grid;
   gap: 14px;
+}
+
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dce5ed;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgb(15 107 143 / 0.08), transparent 54%),
+    var(--color-bg-subtle);
+}
+
+.profile-header div {
+  min-width: 0;
+}
+
+.profile-header h2,
+.profile-header p {
+  margin: 0;
+}
+
+.profile-header h2 {
+  margin-top: 10px;
+  font-size: 22px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.profile-header p {
+  margin-top: 5px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  direction: ltr;
+  text-align: right;
+}
+
+.profile-header > strong {
+  align-self: flex-start;
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  color: var(--color-action-primary);
+  background: var(--color-status-info-bg);
+  font-size: 13px;
 }
 
 .detail-grid,
@@ -534,6 +665,70 @@ textarea:focus {
   width: 100%;
 }
 
+.applicant-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid rgb(15 107 143 / 0.16);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-inverse);
+  background:
+    linear-gradient(135deg, rgb(11 18 32 / 0.96), rgb(15 107 143 / 0.9)),
+    var(--color-bg-sidebar);
+  box-shadow: var(--shadow-card);
+}
+
+.applicant-hero span,
+.applicant-hero p {
+  color: rgb(255 255 255 / 0.78);
+}
+
+.applicant-hero span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.applicant-hero h2,
+.applicant-hero p {
+  margin: 0;
+}
+
+.applicant-hero h2 {
+  margin-top: 8px;
+  font-size: clamp(24px, 4vw, 36px);
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.applicant-hero p {
+  max-width: 620px;
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+.hero-badge {
+  display: grid;
+  place-items: center;
+  min-width: 150px;
+  padding: 18px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 0.1);
+}
+
+.hero-badge strong {
+  margin-top: 8px;
+  font-size: 16px;
+}
+
+.hero-badge span {
+  margin-top: 3px;
+  font-size: 12px;
+}
+
 .applicant-card {
   display: grid;
   gap: 16px;
@@ -596,6 +791,10 @@ textarea:focus {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .insight-strip {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 680px) {
@@ -650,6 +849,24 @@ textarea:focus {
   .detail-grid,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-header,
+  .applicant-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-header {
+    flex-direction: column;
+  }
+
+  .profile-header > strong {
+    align-self: stretch;
+    text-align: center;
+  }
+
+  .hero-badge {
+    min-width: 0;
   }
 
   .panel {

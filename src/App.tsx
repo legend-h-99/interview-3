@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  Clock3,
   Download,
   FileCheck2,
   FileText,
@@ -13,6 +14,7 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  Sparkles,
   UploadCloud,
   UserCheck,
   Users,
@@ -72,6 +74,14 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'committee', label: 'لجان المقابلات', icon: UserCheck },
   { id: 'applicant', label: 'واجهة المتقدم', icon: QrCode },
 ]
+
+const roleDescriptions: Record<Role, string> = {
+  college: 'نظرة تنفيذية على سير المقابلات، نسب الإنجاز، والنتائج المعتمدة.',
+  trainees: 'مراجعة الطلبات والوثائق وإصدار أرقام الانتظار للمتقدمين.',
+  head: 'توزيع المتقدمين على اللجان واعتماد النتائج النهائية.',
+  committee: 'إدارة جلسات المقابلة وتسجيل الدرجات والملاحظات.',
+  applicant: 'تسجيل طلب جديد أو متابعة حالة الطلب برقم الهوية.',
+}
 
 const committees: Committee[] = [
   { id: 'c1', name: 'لجنة المقابلات الأولى', room: 'قاعة 203', members: ['م. أحمد سالم', 'م. نورة الحربي'] },
@@ -173,8 +183,10 @@ function App() {
     const approved = applicants.filter((item) => item.status === 'النتيجة معتمدة').length
     const pendingDocs = applicants.filter((item) => item.status.includes('مراجعة') || item.status.includes('استكمال')).length
     const interviewed = applicants.filter((item) => item.status === 'بانتظار اعتماد رئيس القسم' || item.status === 'النتيجة معتمدة').length
-    return { total: applicants.length, approved, pendingDocs, interviewed }
+    const scheduled = applicants.filter((item) => item.interviewAt).length
+    return { total: applicants.length, approved, pendingDocs, interviewed, scheduled }
   }, [applicants])
+  const activeRole = applicantOnly ? 'applicant' : role
 
   const refreshApplicants = async () => {
     const response = await fetch(apiUrl('/api/applicants'))
@@ -293,6 +305,7 @@ function App() {
           <div>
             <p>interview 3 / وحدة القبول والمقابلات</p>
             <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
+            <span className="topbar-description">{roleDescriptions[activeRole]}</span>
           </div>
           {!applicantOnly && <div className="quick-actions">
             <button type="button"><Download size={17} /> تصدير Excel</button>
@@ -301,12 +314,31 @@ function App() {
         </header>
 
         {!applicantOnly && role !== 'applicant' && (
-          <section className="metrics" aria-label="مؤشرات النظام">
-            <Metric icon={Users} label="إجمالي المتقدمين" value={stats.total} />
-            <Metric icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} />
-            <Metric icon={CalendarDays} label="تمت مقابلتهم" value={stats.interviewed} />
-            <Metric icon={CheckCircle2} label="نتائج معتمدة" value={stats.approved} />
-          </section>
+          <>
+            <section className="metrics" aria-label="مؤشرات النظام">
+              <Metric icon={Users} label="إجمالي المتقدمين" value={stats.total} tone="blue" />
+              <Metric icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} tone="amber" />
+              <Metric icon={CalendarDays} label="مواعيد مجدولة" value={stats.scheduled} tone="teal" />
+              <Metric icon={CheckCircle2} label="نتائج معتمدة" value={stats.approved} tone="green" />
+            </section>
+            <section className="insight-strip" aria-label="ملخص سريع">
+              <div>
+                <Sparkles size={18} />
+                <span>جاهزية المقابلات</span>
+                <strong>{stats.total ? Math.round((stats.scheduled / stats.total) * 100) : 0}%</strong>
+              </div>
+              <div>
+                <Clock3 size={18} />
+                <span>تحتاج متابعة</span>
+                <strong>{stats.pendingDocs}</strong>
+              </div>
+              <div>
+                <ShieldCheck size={18} />
+                <span>آخر ملف محدد</span>
+                <strong>{selected.requestNo}</strong>
+              </div>
+            </section>
+          </>
         )}
 
         {role === 'college' && <CollegeView applicants={applicants} stats={stats} />}
@@ -342,9 +374,9 @@ function calculateScore(applicant: Applicant) {
   return Math.round(applicant.scores.technical * 0.45 + applicant.scores.communication * 0.25 + applicant.scores.motivation * 0.3)
 }
 
-function Metric({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number }) {
+function Metric({ icon: Icon, label, value, tone }: { icon: typeof Users; label: string; value: number; tone: 'blue' | 'amber' | 'teal' | 'green' }) {
   return (
-    <article className="metric">
+    <article className={`metric ${tone}`}>
       <Icon size={22} />
       <span>{label}</span>
       <strong>{value}</strong>
@@ -394,15 +426,19 @@ function Details({ applicant }: { applicant: Applicant }) {
   const committee = committees.find((item) => item.id === applicant.committeeId)
   return (
     <section className="details">
-      <div className="section-title">
-        <h2>{applicant.name}</h2>
-        <span>{applicant.requestNo}</span>
+      <div className="profile-header">
+        <div>
+          <span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span>
+          <h2>{applicant.name}</h2>
+          <p><span>{applicant.requestNo}</span> · {applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</p>
+        </div>
+        <strong>{applicant.waitingNo ? `رقم الانتظار ${applicant.waitingNo}` : 'بدون رقم انتظار'}</strong>
       </div>
       <div className="detail-grid">
         <Info label="رقم الهوية" value={applicant.nationalId} />
         <Info label="الجوال" value={applicant.phone} />
         <Info label="المؤهل" value={applicant.qualification} />
-        <Info label="حالة الطلب" value={applicant.status} />
+        <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
         <Info label="اللجنة" value={committee?.name ?? 'غير موزع'} />
         <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
         <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 100`} />
@@ -571,6 +607,18 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
   const found = applicants.find((item) => item.nationalId === nationalId)
   return (
     <div className="applicant-shell">
+      <section className="applicant-hero">
+        <div>
+          <span>بوابة آمنة وسريعة</span>
+          <h2>سجل طلبك وتابع حالته من مكان واحد</h2>
+          <p>تظهر بيانات التسجيل مباشرة لدى شؤون المتدربين واللجان، ويحصل الطلب على رقم مرجعي فور حفظه.</p>
+        </div>
+        <div className="hero-badge">
+          <QrCode size={34} />
+          <strong>interview 3</strong>
+          <span>متصل بالنظام</span>
+        </div>
+      </section>
       <section className="panel applicant-card">
         <div className="qr-box"><QrCode size={82} /><span>رابط التسجيل المباشر</span></div>
         <div className="section-title"><h2>البحث أو التسجيل</h2><Search size={21} /></div>
