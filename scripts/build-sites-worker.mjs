@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { extname, join, relative } from 'node:path'
 
 const distDir = new URL('../dist/', import.meta.url)
@@ -366,3 +366,5 @@ export default {
 
 await mkdir(serverDir, { recursive: true })
 await writeFile(join(serverDir.pathname, 'index.js'), workerSource.trimStart())
+await mkdir(join(distDir.pathname, '.openai'), { recursive: true })
+await copyFile(new URL('../.openai/hosting.json', import.meta.url), join(distDir.pathname, '.openai/hosting.json'))
