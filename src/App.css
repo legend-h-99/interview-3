@@ -70,6 +70,7 @@
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -149,6 +150,7 @@ button svg,
 
 .topbar p,
 .topbar h1,
+.institution-line,
 .topbar-description {
   margin: 0;
 }
@@ -174,11 +176,29 @@ button svg,
   line-height: 1.6;
 }
 
+.institution-line {
+  display: block;
+  margin-top: 7px;
+  color: var(--color-action-primary);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
 .quick-actions {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
   padding-top: 4px;
+}
+
+.manager-select {
+  display: grid;
+  gap: 5px;
+  min-width: 250px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .quick-actions button,
@@ -671,6 +691,7 @@ textarea {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   box-sizing: border-box;
@@ -685,6 +706,12 @@ textarea {
     box-shadow 0.18s ease;
 }
 
+select {
+  min-height: 42px;
+  margin-top: 0;
+  color: var(--color-text-primary);
+}
+
 label {
   min-width: 0;
   color: var(--color-text-primary);
@@ -693,6 +720,7 @@ label {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--color-action-primary);
@@ -882,6 +910,7 @@ textarea:focus {
   }
 
   .quick-actions button,
+  .manager-select,
   .toolbar button,
   .actions button,
   .form-grid button {

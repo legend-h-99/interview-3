@@ -75,6 +75,7 @@ describe('Interview management system', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: 'شؤون المتدربين' })).toBeTruthy()
+    expect(screen.getByText('الكلية التقنية للاتصالات والمعلومات · قسم التقنية الخاصة للصم وضعاف السمع')).toBeTruthy()
     expect(screen.getAllByText('عبدالله محمد الزهراني').length).toBeGreaterThan(0)
     expect(screen.getAllByText('REQ-2026-0001').length).toBeGreaterThan(0)
     expect(screen.getByText('W-014')).toBeTruthy()
@@ -107,7 +108,7 @@ describe('Interview management system', () => {
     expect(screen.queryByRole('button', { name: 'شؤون المتدربين' })).toBeNull()
   })
 
-  it('exports applicants to an Excel-compatible CSV file', async () => {
+  it('exports applicants and college identity to an Excel-compatible CSV file', async () => {
     const user = userEvent.setup()
     const createObjectUrl = vi.fn(() => 'blob:interview-3-export')
     const revokeObjectUrl = vi.fn()
@@ -116,14 +117,22 @@ describe('Interview management system', () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     render(<App />)
 
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
+    await user.selectOptions(screen.getByLabelText('مسؤول إدارة الكلية'), '2')
     await user.click(screen.getByRole('button', { name: /تصدير Excel/ }))
 
     expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
+    const blob = createObjectUrl.mock.calls.at(0)?.at(0) as unknown as Blob
+    const csv = await blob.text()
+    expect(csv).toContain('الكلية التقنية للاتصالات والمعلومات')
+    expect(csv).toContain('قسم التقنية الخاصة للصم وضعاف السمع')
+    expect(csv).toContain('وكيل الجودة: عبدالرحمن المالكي')
+    expect(csv).toContain('محمد الرميح')
     expect(clickSpy).toHaveBeenCalled()
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-export')
   })
 
-  it('opens a printable PDF report for applicants', async () => {
+  it('opens a printable PDF report with college identity and selected manager', async () => {
     const user = userEvent.setup()
     const write = vi.fn()
     const close = vi.fn()
@@ -132,10 +141,16 @@ describe('Interview management system', () => {
     } as unknown as Window)
     render(<App />)
 
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
+    await user.selectOptions(screen.getByLabelText('مسؤول إدارة الكلية'), '1')
     await user.click(screen.getByRole('button', { name: /تقرير PDF/ }))
 
     expect(window.open).toHaveBeenCalled()
     expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير interview 3'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('الكلية التقنية للاتصالات والمعلومات'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('قسم التقنية الخاصة للصم وضعاف السمع'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('وكيل التدريب: أحمد الطلحي'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('محمد الرميح'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('عبدالله محمد الزهراني'))
     expect(close).toHaveBeenCalled()
   })

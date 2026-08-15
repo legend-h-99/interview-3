@@ -67,6 +67,23 @@ type Committee = {
   members: string[]
 }
 
+type CollegeManager = {
+  title: string
+  name: string
+}
+
+const collegeProfile = {
+  collegeName: 'الكلية التقنية للاتصالات والمعلومات',
+  departmentName: 'قسم التقنية الخاصة للصم وضعاف السمع',
+  traineeAffairsDeputy: 'محمد الرميح',
+}
+
+const collegeManagers: CollegeManager[] = [
+  { title: 'العميد', name: 'د. سعود العتيبي' },
+  { title: 'وكيل التدريب', name: 'أحمد الطلحي' },
+  { title: 'وكيل الجودة', name: 'عبدالرحمن المالكي' },
+]
+
 const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'college', label: 'إدارة الكلية', icon: LayoutDashboard },
   { id: 'trainees', label: 'شؤون المتدربين', icon: ClipboardCheck },
@@ -164,15 +181,23 @@ const questions = [
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
+const exportHeaders = ['اسم الكلية', 'القسم', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
 
 function csvCell(value: string | number | undefined) {
   const text = String(value ?? '')
   return `"${text.replaceAll('"', '""')}"`
 }
 
-function exportApplicantsExcel(applicants: Applicant[]) {
+function formatManager(manager: CollegeManager) {
+  return `${manager.title}: ${manager.name}`
+}
+
+function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager) {
   const rows = applicants.map((applicant) => [
+    collegeProfile.collegeName,
+    collegeProfile.departmentName,
+    formatManager(selectedManager),
+    collegeProfile.traineeAffairsDeputy,
     applicant.requestNo,
     applicant.name,
     applicant.nationalId,
@@ -205,7 +230,7 @@ function escapeHtml(value: string | number | undefined) {
     .replaceAll("'", '&#039;')
 }
 
-function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }) {
+function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }, selectedManager: CollegeManager) {
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
 
@@ -231,6 +256,10 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
           header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
           h1 { margin: 0 0 8px; font-size: 28px; }
           p { margin: 0; color: #667085; }
+          .identity { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0; }
+          .identity div { border: 1px solid #d9e2ec; border-radius: 8px; padding: 10px 12px; background: #fafdff; }
+          .identity span { display: block; color: #667085; font-size: 12px; }
+          .identity strong { display: block; margin-top: 4px; font-size: 15px; }
           .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
           .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; }
           .metric span { display: block; color: #667085; font-size: 12px; }
@@ -246,6 +275,12 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
           <h1>تقرير interview 3</h1>
           <p>وحدة القبول والمقابلات - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
         </header>
+        <section class="identity">
+          <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
+          <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
+          <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
+          <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
+        </section>
         <section class="metrics">
           <div class="metric"><span>إجمالي المتقدمين</span><strong>${stats.total}</strong></div>
           <div class="metric"><span>طلبات قيد المراجعة</span><strong>${stats.pendingDocs}</strong></div>
@@ -270,6 +305,7 @@ function App() {
   const [role, setRole] = useState<Role>(applicantOnly ? 'applicant' : 'trainees')
   const [applicants, setApplicants] = useState<Applicant[]>(seedApplicants)
   const [selectedId, setSelectedId] = useState(seedApplicants[0].id)
+  const [selectedManagerIndex, setSelectedManagerIndex] = useState(0)
   const [nationalId, setNationalId] = useState('')
   const [form, setForm] = useState({
     name: '',
@@ -287,6 +323,7 @@ function App() {
     return { total: applicants.length, approved, pendingDocs, interviewed, scheduled }
   }, [applicants])
   const activeRole = applicantOnly ? 'applicant' : role
+  const selectedManager = collegeManagers[selectedManagerIndex] ?? collegeManagers[0]
 
   const refreshApplicants = async () => {
     const response = await fetch(apiUrl('/api/applicants'))
@@ -405,11 +442,20 @@ function App() {
           <div>
             <p>interview 3 / وحدة القبول والمقابلات</p>
             <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
+            <span className="institution-line">{collegeProfile.collegeName} · {collegeProfile.departmentName}</span>
             <span className="topbar-description">{roleDescriptions[activeRole]}</span>
           </div>
           {!applicantOnly && <div className="quick-actions">
-            <button onClick={() => exportApplicantsExcel(applicants)} type="button"><Download size={17} /> تصدير Excel</button>
-            <button onClick={() => openApplicantsPdfReport(applicants, stats)} type="button"><FileText size={17} /> تقرير PDF</button>
+            {role === 'college' && (
+              <label className="manager-select">
+                مسؤول إدارة الكلية
+                <select value={selectedManagerIndex} onChange={(event) => setSelectedManagerIndex(Number(event.target.value))}>
+                  {collegeManagers.map((manager, index) => <option key={manager.name} value={index}>{formatManager(manager)}</option>)}
+                </select>
+              </label>
+            )}
+            <button onClick={() => exportApplicantsExcel(applicants, selectedManager)} type="button"><Download size={17} /> تصدير Excel</button>
+            <button onClick={() => openApplicantsPdfReport(applicants, stats, selectedManager)} type="button"><FileText size={17} /> تقرير PDF</button>
           </div>}
         </header>
 
