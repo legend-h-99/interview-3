@@ -37,7 +37,46 @@ async function collectFiles(dirUrl, rootUrl = dirUrl) {
 }
 
 const files = await collectFiles(distDir)
+const acceptedApplicants = JSON.parse(await readFile(new URL('../src/data/acceptedApplicants.json', import.meta.url), 'utf8'))
+
+function normalizeImportedPhone(phone) {
+  return phone.startsWith('5') ? `0${phone}` : phone
+}
+
+function acceptedToApplicant(item, index) {
+  return {
+    id: `accepted-${item.nationalId}`,
+    nationalId: item.nationalId,
+    requestNo: `ACC-2026-${String(index + 1).padStart(4, '0')}`,
+    name: item.name,
+    nationality: '',
+    age: 0,
+    certificateType: item.major,
+    graduationDate: '',
+    phone: normalizeImportedPhone(item.phone),
+    extraPhone: '',
+    qualification: item.program,
+    gpa: 0,
+    source: 'qobool',
+    status: 'بانتظار استكمال بيانات المتقدم',
+    documents: [
+      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
+      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
+      { name: 'نموذج الإقرار', status: 'معتمد' },
+    ],
+    scores: { technical: 0, communication: 0, motivation: 0 },
+    notes: '',
+    admissionStatus: item.admissionStatus,
+    organization: item.organization,
+    major: item.major,
+    program: item.program,
+    preferenceNo: item.preferenceNo,
+    audit: ['استيراد بيانات القبول النهائي', 'بانتظار استكمال بيانات المتقدم'],
+  }
+}
+
 const seedApplicants = [
+  ...acceptedApplicants.map(acceptedToApplicant),
   {
     id: 'a1',
     nationalId: '1012345678',
@@ -150,6 +189,11 @@ const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   scores_json TEXT NOT NULL,
   notes TEXT NOT NULL DEFAULT '',
   final_result TEXT,
+  admission_status TEXT,
+  organization TEXT,
+  major TEXT,
+  program TEXT,
+  preference_no TEXT,
   audit_json TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -168,6 +212,11 @@ const migrationSql = [
   "ALTER TABLE applicants ADD COLUMN certificate_type TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE applicants ADD COLUMN graduation_date TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE applicants ADD COLUMN extra_phone TEXT NOT NULL DEFAULT ''",
+  'ALTER TABLE applicants ADD COLUMN admission_status TEXT',
+  'ALTER TABLE applicants ADD COLUMN organization TEXT',
+  'ALTER TABLE applicants ADD COLUMN major TEXT',
+  'ALTER TABLE applicants ADD COLUMN program TEXT',
+  'ALTER TABLE applicants ADD COLUMN preference_no TEXT',
 ];
 
 function decodeBase64(value) {
@@ -240,6 +289,11 @@ function rowToApplicant(row) {
     scores: JSON.parse(row.scores_json),
     notes: row.notes || '',
     finalResult: row.final_result || undefined,
+    admissionStatus: row.admission_status || undefined,
+    organization: row.organization || undefined,
+    major: row.major || undefined,
+    program: row.program || undefined,
+    preferenceNo: row.preference_no || undefined,
     audit: JSON.parse(row.audit_json),
   };
 }
@@ -249,8 +303,9 @@ function insertApplicantStatement(db, applicant) {
     id, national_id, request_no, waiting_no, name, nationality, age, certificate_type,
     graduation_date, phone, extra_phone, qualification, gpa,
     source, status, committee_id, committee_number, committee_trainers_json,
-    translator_id, interview_at, documents_json, scores_json, notes, final_result, audit_json
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`).bind(
+    translator_id, interview_at, documents_json, scores_json, notes, final_result,
+    admission_status, organization, major, program, preference_no, audit_json
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`).bind(
     applicant.id,
     applicant.nationalId,
     applicant.requestNo,
@@ -275,6 +330,11 @@ function insertApplicantStatement(db, applicant) {
     JSON.stringify(applicant.scores),
     applicant.notes || '',
     applicant.finalResult || null,
+    applicant.admissionStatus || null,
+    applicant.organization || null,
+    applicant.major || null,
+    applicant.program || null,
+    applicant.preferenceNo || null,
     JSON.stringify(applicant.audit),
   );
 }
@@ -294,10 +354,7 @@ async function ensureDb(env) {
       if (!(error instanceof Error) || !error.message.includes('duplicate column')) throw error;
     }
   }
-  const count = await db.prepare('SELECT COUNT(*) AS total FROM applicants').first();
-  if ((count?.total ?? 0) === 0) {
-    await db.batch(seedApplicants.map((applicant) => insertApplicantStatement(db, applicant)));
-  }
+  await db.batch(seedApplicants.map((applicant) => insertApplicantStatement(db, applicant)));
   return db;
 }
 
@@ -314,10 +371,13 @@ async function createApplicant(env, request) {
   if (existing) return json({ applicant: rowToApplicant(existing), duplicate: true });
 
   const count = await db.prepare('SELECT COUNT(*) AS total FROM applicants').first();
+  const interviewed = await db.prepare('SELECT COUNT(*) AS total FROM applicants WHERE waiting_no IS NOT NULL').first();
+  const waitingNo = \`INT-\${String((interviewed?.total ?? 0) + 1).padStart(3, '0')}\`;
   const applicant = {
     id: crypto.randomUUID(),
     nationalId: body.nationalId,
     requestNo: \`REQ-2026-\${String((count?.total ?? 0) + 1).padStart(4, '0')}\`,
+    waitingNo,
     name: body.name,
     nationality: body.nationality || '',
     age: Number(body.age || 0),
@@ -328,7 +388,7 @@ async function createApplicant(env, request) {
     qualification: body.qualification || body.certificateType || '',
     gpa: Number(body.gpa || 0),
     source: 'direct',
-    status: 'بانتظار مراجعة شؤون المتدربين',
+    status: 'تم إصدار رقم الانتظار',
     committeeTrainerIds: [],
     documents: [
       { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
@@ -337,7 +397,7 @@ async function createApplicant(env, request) {
     ],
     scores: { technical: 0, communication: 0, motivation: 0 },
     notes: '',
-    audit: ['إنشاء طلب جديد وتأكيد الإقرار'],
+    audit: [\`إنشاء طلب جديد وإصدار رقم مقابلة \${waitingNo}\`],
   };
   await insertApplicantStatement(db, applicant).run();
   return json({ applicant }, { status: 201 });
@@ -376,6 +436,11 @@ async function updateApplicant(env, request, id) {
     scores_json = ?,
     notes = ?,
     final_result = ?,
+    admission_status = ?,
+    organization = ?,
+    major = ?,
+    program = ?,
+    preference_no = ?,
     audit_json = ?,
     updated_at = CURRENT_TIMESTAMP
     WHERE id = ?\`).bind(
@@ -400,6 +465,11 @@ async function updateApplicant(env, request, id) {
       JSON.stringify(next.scores),
       next.notes || '',
       next.finalResult || null,
+      next.admissionStatus || null,
+      next.organization || null,
+      next.major || null,
+      next.program || null,
+      next.preferenceNo || null,
       JSON.stringify(next.audit),
       id,
     ).run();

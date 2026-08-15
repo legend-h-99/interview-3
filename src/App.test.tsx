@@ -25,10 +25,12 @@ beforeEach(() => {
       const body = JSON.parse(String(init?.body))
       const existing = apiApplicants.find((applicant) => applicant.nationalId === body.nationalId)
       if (existing) return jsonResponse({ applicant: existing, duplicate: true })
+      const waitingNo = `INT-${String(apiApplicants.filter((applicant) => applicant.waitingNo).length + 1).padStart(3, '0')}`
       const applicant = {
         id: `test-${body.nationalId}`,
         nationalId: body.nationalId,
         requestNo: `REQ-2026-${String(apiApplicants.length + 1).padStart(4, '0')}`,
+        waitingNo,
         name: body.name,
         nationality: body.nationality,
         age: Number(body.age),
@@ -39,7 +41,7 @@ beforeEach(() => {
         qualification: body.qualification || body.certificateType,
         gpa: Number(body.gpa || 0),
         source: 'direct' as const,
-        status: 'بانتظار مراجعة شؤون المتدربين' as const,
+        status: 'تم إصدار رقم الانتظار' as const,
         documents: [
           { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' as const },
           { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' as const },
@@ -47,7 +49,7 @@ beforeEach(() => {
         ],
         scores: { technical: 0, communication: 0, motivation: 0 },
         notes: '',
-        audit: ['إنشاء طلب جديد وتأكيد الإقرار'],
+        audit: [`إنشاء طلب جديد وإصدار رقم مقابلة ${waitingNo}`],
       }
       apiApplicants = [applicant, ...apiApplicants]
       return jsonResponse({ applicant }, 201)
@@ -91,7 +93,7 @@ describe('Interview management system', () => {
     render(<App />)
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'واجهة المتقدم' }))
-    await user.type(screen.getByLabelText('رقم الهوية الوطنية'), '1099999999')
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), '1099999999')
     await user.type(screen.getByLabelText('الاسم الكامل'), 'مازن صالح القحطاني')
     await user.clear(screen.getByLabelText('الجنسية'))
     await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
@@ -100,12 +102,13 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
     await user.type(screen.getByLabelText('رقم الجوال'), '0557778888')
     await user.type(screen.getByLabelText('رقم جوال إضافي'), '0557779999')
-    await user.click(screen.getByRole('button', { name: /رفع الوثائق/ }))
+    await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
 
     expect(await screen.findByText('مازن صالح القحطاني')).toBeTruthy()
-    expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
+    expect(screen.getByText('REQ-2026-0034')).toBeTruthy()
     expect(screen.getByText('0557779999')).toBeTruthy()
-    expect(screen.getByText('بانتظار مراجعة شؤون المتدربين')).toBeTruthy()
+    expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
+    expect(screen.getByText('تم إصدار رقم الانتظار')).toBeTruthy()
   })
 
   it('opens the applicant portal directly from a dedicated link', () => {
@@ -113,7 +116,7 @@ describe('Interview management system', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
-    expect(screen.getByLabelText('رقم الهوية الوطنية')).toBeTruthy()
+    expect(screen.getByLabelText('رقم الهوية الوطنية أو الاسم')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'شؤون المتدربين' })).toBeNull()
   })
 
@@ -174,7 +177,7 @@ describe('Interview management system', () => {
     window.history.pushState({}, '', '/?view=applicant')
     const { unmount } = render(<App />)
 
-    await user.type(screen.getByLabelText('رقم الهوية الوطنية'), '1088888888')
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), '1088888888')
     await user.type(screen.getByLabelText('الاسم الكامل'), 'تركي ناصر الحربي')
     await user.clear(screen.getByLabelText('الجنسية'))
     await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
@@ -183,11 +186,11 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-05-30')
     await user.type(screen.getByLabelText('رقم الجوال'), '0551112222')
     await user.type(screen.getByLabelText('رقم جوال إضافي'), '0551113333')
-    await user.click(screen.getByRole('button', { name: /رفع الوثائق/ }))
+    await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
 
     expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
-    expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
-    expect(screen.getByText('بانتظار مراجعة شؤون المتدربين')).toBeTruthy()
+    expect(screen.getByText('REQ-2026-0034')).toBeTruthy()
+    expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
 
     unmount()
     window.history.pushState({}, '', '/')
@@ -195,7 +198,7 @@ describe('Interview management system', () => {
 
     expect(screen.getByRole('heading', { name: 'شؤون المتدربين' })).toBeTruthy()
     expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
-    expect(screen.getByText('REQ-2026-0004')).toBeTruthy()
+    expect(screen.getByText('REQ-2026-0034')).toBeTruthy()
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
     expect(screen.getByText('تركي ناصر الحربي')).toBeTruthy()
@@ -209,11 +212,11 @@ describe('Interview management system', () => {
     render(<App />)
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'واجهة المتقدم' }))
-    await user.type(screen.getByLabelText('رقم الهوية الوطنية'), '1012345678')
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), '1012345678')
 
     expect(screen.getAllByText('عبدالله محمد الزهراني').length).toBeGreaterThan(0)
     expect(screen.getByText('REQ-2026-0001')).toBeTruthy()
-    expect(screen.queryByLabelText('الاسم الكامل')).toBeNull()
+    expect(screen.getByLabelText('الاسم الكامل')).toBeTruthy()
   })
 
   it('approves documents and issues a waiting number from trainee affairs', async () => {

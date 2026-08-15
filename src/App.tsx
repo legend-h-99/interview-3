@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import acceptedApplicantsData from './data/acceptedApplicants.json'
 
 type Role = 'college' | 'trainees' | 'head' | 'committee' | 'applicant'
 type Source = 'qobool' | 'direct'
@@ -28,6 +29,7 @@ type Status =
   | 'مستورد من بوابة قبول'
   | 'تسجيل جديد غير مكتمل'
   | 'بانتظار رفع الوثائق'
+  | 'بانتظار استكمال بيانات المتقدم'
   | 'بانتظار مراجعة شؤون المتدربين'
   | 'يحتاج إلى استكمال أو تصحيح'
   | 'مكتمل ومعتمد'
@@ -65,6 +67,11 @@ type Applicant = {
   scores: { technical: number; communication: number; motivation: number }
   notes: string
   finalResult?: 'مقبول' | 'احتياط' | 'غير مقبول'
+  admissionStatus?: string
+  organization?: string
+  major?: string
+  program?: string
+  preferenceNo?: string
   audit: string[]
 }
 
@@ -83,6 +90,17 @@ type StaffMember = {
 type CollegeManager = {
   title: string
   name: string
+}
+
+type AcceptedApplicant = {
+  nationalId: string
+  name: string
+  phone: string
+  organization: string
+  major: string
+  program: string
+  preferenceNo: string
+  admissionStatus: string
 }
 
 const collegeProfile = {
@@ -136,8 +154,48 @@ const committees: Committee[] = [
 
 const trainerMembers = staffMembers.filter((member) => member.task.startsWith('لجنة '))
 const translatorMembers = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
+const acceptedApplicants = acceptedApplicantsData as AcceptedApplicant[]
+
+function normalizeImportedPhone(phone: string) {
+  return phone.startsWith('5') ? `0${phone}` : phone
+}
+
+function acceptedToApplicant(item: AcceptedApplicant, index: number): Applicant {
+  return {
+    id: `accepted-${item.nationalId}`,
+    nationalId: item.nationalId,
+    requestNo: `ACC-2026-${String(index + 1).padStart(4, '0')}`,
+    name: item.name,
+    nationality: '',
+    age: 0,
+    certificateType: item.major,
+    graduationDate: '',
+    phone: normalizeImportedPhone(item.phone),
+    extraPhone: '',
+    qualification: item.program,
+    gpa: 0,
+    source: 'qobool',
+    status: 'بانتظار استكمال بيانات المتقدم',
+    documents: [
+      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
+      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
+      { name: 'نموذج الإقرار', status: 'معتمد' },
+    ],
+    scores: { technical: 0, communication: 0, motivation: 0 },
+    notes: '',
+    admissionStatus: item.admissionStatus,
+    organization: item.organization,
+    major: item.major,
+    program: item.program,
+    preferenceNo: item.preferenceNo,
+    audit: ['استيراد بيانات القبول النهائي', 'بانتظار استكمال بيانات المتقدم'],
+  }
+}
+
+const acceptedSeedApplicants = acceptedApplicants.map(acceptedToApplicant)
 
 export const seedApplicants: Applicant[] = [
+  ...acceptedSeedApplicants,
   {
     id: 'a1',
     nationalId: '1012345678',
@@ -231,7 +289,7 @@ const questions = [
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
@@ -278,6 +336,8 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
     applicant.graduationDate,
     applicant.phone,
     applicant.extraPhone,
+    applicant.program ?? '',
+    applicant.admissionStatus ?? '',
     applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر',
     applicant.status,
     applicant.waitingNo ?? '',
@@ -326,6 +386,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
       <td>${escapeHtml(applicant.graduationDate)}</td>
       <td>${escapeHtml(applicant.phone)}</td>
       <td>${escapeHtml(applicant.extraPhone)}</td>
+      <td>${escapeHtml(applicant.admissionStatus ?? '')}</td>
       <td>${escapeHtml(applicant.status)}</td>
       <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
     </tr>
@@ -376,7 +437,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         </section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الجنسية</th><th>العمر</th><th>نوع الشهادة</th><th>تاريخ التخرج</th><th>رقم الجوال</th><th>رقم جوال إضافي</th><th>الحالة</th><th>رقم الانتظار</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الجنسية</th><th>العمر</th><th>نوع الشهادة</th><th>تاريخ التخرج</th><th>رقم الجوال</th><th>رقم جوال إضافي</th><th>حالة القبول</th><th>الحالة</th><th>رقم المقابلة</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -410,6 +471,7 @@ function App() {
   const [selectedManagerIndex, setSelectedManagerIndex] = useState(0)
   const [nationalId, setNationalId] = useState('')
   const [form, setForm] = useState({
+    nationalId: '',
     name: '',
     nationality: 'سعودي',
     age: '',
@@ -496,13 +558,40 @@ function App() {
     await updateApplicant(id, { status: 'النتيجة معتمدة' }, 'اعتماد النتيجة النهائية من رئيس القسم')
   }
 
+  const nextInterviewNumber = () => `INT-${String(applicants.filter((item) => item.waitingNo).length + 1).padStart(3, '0')}`
+
   const registerApplicant = async () => {
-    if (!nationalId || !form.name) return
+    const applicantNationalId = form.nationalId || (/^\d+$/.test(nationalId) ? nationalId : '')
+    if (!applicantNationalId || !form.name) return
+    const existing = applicants.find((applicant) => applicant.nationalId === applicantNationalId)
+    if (existing) {
+      const interviewNo = existing.waitingNo ?? nextInterviewNumber()
+      await updateApplicant(
+        existing.id,
+        {
+          nationalId: applicantNationalId,
+          name: form.name,
+          nationality: form.nationality,
+          age: Number(form.age),
+          certificateType: form.certificateType,
+          graduationDate: form.graduationDate,
+          phone: form.phone,
+          extraPhone: form.extraPhone,
+          qualification: form.certificateType,
+          gpa: 0,
+          waitingNo: interviewNo,
+          status: 'تم إصدار رقم الانتظار',
+        },
+        `استكمال بيانات المتقدم وإصدار رقم مقابلة ${interviewNo}`,
+      )
+      setSelectedId(existing.id)
+      return
+    }
     const response = await fetch(apiUrl('/api/applicants'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        nationalId,
+        nationalId: applicantNationalId,
         name: form.name,
         nationality: form.nationality,
         age: Number(form.age),
@@ -701,7 +790,7 @@ function Details({ applicant }: { applicant: Applicant }) {
           <h2>{applicant.name}</h2>
           <p><span>{applicant.requestNo}</span> · {applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</p>
         </div>
-        <strong>{applicant.waitingNo ? `رقم الانتظار ${applicant.waitingNo}` : 'بدون رقم انتظار'}</strong>
+        <strong>{applicant.waitingNo ? `رقم المقابلة ${applicant.waitingNo}` : 'بدون رقم مقابلة'}</strong>
       </div>
       <div className="detail-grid">
         <Info label="رقم الهوية" value={applicant.nationalId} />
@@ -711,6 +800,8 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="تاريخ التخرج" value={applicant.graduationDate} />
         <Info label="رقم الجوال" value={applicant.phone} />
         <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
+        {applicant.admissionStatus && <Info label="حالة القبول" value={applicant.admissionStatus} />}
+        {applicant.program && <Info label="البرنامج" value={applicant.program} />}
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
         <Info label="اللجنة" value={committeeNumber ? `لجنة ${committeeNumber}` : 'غير موزع'} />
         <Info label="المدربون" value={trainers || 'لم يتم الاختيار'} />
@@ -1013,11 +1104,33 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
   applicants: Applicant[]
   nationalId: string
   setNationalId: (value: string) => void
-  form: { name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }
-  setForm: (value: { name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }) => void
+  form: { nationalId: string; name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }
+  setForm: (value: { nationalId: string; name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }) => void
   registerApplicant: () => void
 }) {
-  const found = applicants.find((item) => item.nationalId === nationalId)
+  const lookup = nationalId.trim()
+  const found = applicants.find((item) => item.nationalId === lookup || (lookup.length > 1 && item.name.includes(lookup)))
+
+  useEffect(() => {
+    if (!found) {
+      setForm({
+        ...form,
+        nationalId: /^\d+$/.test(lookup) ? lookup : form.nationalId,
+      })
+      return
+    }
+    setForm({
+      nationalId: found.nationalId,
+      name: found.name,
+      nationality: found.nationality || 'سعودي',
+      age: found.age ? String(found.age) : '',
+      certificateType: found.certificateType,
+      graduationDate: found.graduationDate,
+      phone: found.phone,
+      extraPhone: found.extraPhone,
+    })
+  }, [found?.id, lookup])
+
   return (
     <div className="applicant-shell">
       <section className="applicant-hero">
@@ -1035,23 +1148,23 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
       <section className="panel applicant-card">
         <div className="qr-box"><QrCode size={82} /><span>رابط التسجيل المباشر</span></div>
         <div className="section-title"><h2>البحث أو التسجيل</h2><Search size={21} /></div>
-        <label>رقم الهوية الوطنية<input value={nationalId} onChange={(event) => setNationalId(event.target.value)} placeholder="مثال: 1012345678" /></label>
-        {found ? (
+        <label>رقم الهوية الوطنية أو الاسم<input value={nationalId} onChange={(event) => setNationalId(event.target.value)} placeholder="مثال: 1122595406 أو عماش" /></label>
+        {found && (
           <div className="found">
             <Details applicant={found} />
           </div>
-        ) : (
-          <div className="form-grid">
-            <label>الاسم الكامل<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-            <label>الجنسية<input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} /></label>
-            <label>العمر<input inputMode="numeric" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></label>
-            <label>نوع الشهادة<input value={form.certificateType} onChange={(event) => setForm({ ...form, certificateType: event.target.value })} /></label>
-            <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
-            <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
-            <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
-            <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> رفع الوثائق وتأكيد الإقرار</button>
-          </div>
         )}
+        <div className="form-grid">
+          <label>رقم الهوية<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} /></label>
+          <label>الاسم الكامل<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+          <label>الجنسية<input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} /></label>
+          <label>العمر<input inputMode="numeric" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></label>
+          <label>نوع الشهادة<input value={form.certificateType} onChange={(event) => setForm({ ...form, certificateType: event.target.value })} /></label>
+          <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
+          <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+          <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
+          <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> التحقق وإصدار رقم المقابلة</button>
+        </div>
       </section>
     </div>
   )
