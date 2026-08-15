@@ -164,6 +164,106 @@ const questions = [
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
+const exportHeaders = ['رقم الطلب', 'الاسم', 'رقم الهوية', 'الجوال', 'المؤهل', 'المعدل', 'المصدر', 'الحالة', 'رقم الانتظار', 'موعد المقابلة', 'النتيجة']
+
+function csvCell(value: string | number | undefined) {
+  const text = String(value ?? '')
+  return `"${text.replaceAll('"', '""')}"`
+}
+
+function exportApplicantsExcel(applicants: Applicant[]) {
+  const rows = applicants.map((applicant) => [
+    applicant.requestNo,
+    applicant.name,
+    applicant.nationalId,
+    applicant.phone,
+    applicant.qualification,
+    applicant.gpa,
+    applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر',
+    applicant.status,
+    applicant.waitingNo ?? '',
+    applicant.interviewAt ?? '',
+    applicant.finalResult ?? '',
+  ])
+  const csv = [exportHeaders, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `interview-3-applicants-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(link.href)
+}
+
+function escapeHtml(value: string | number | undefined) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }) {
+  const report = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=720')
+  if (!report) return
+
+  const rows = applicants.map((applicant) => `
+    <tr>
+      <td>${escapeHtml(applicant.requestNo)}</td>
+      <td>${escapeHtml(applicant.name)}</td>
+      <td>${escapeHtml(applicant.nationalId)}</td>
+      <td>${escapeHtml(applicant.status)}</td>
+      <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
+      <td>${escapeHtml(applicant.gpa)}%</td>
+    </tr>
+  `).join('')
+
+  report.document.write(`
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>تقرير interview 3</title>
+        <style>
+          body { margin: 0; padding: 32px; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #182235; }
+          header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
+          h1 { margin: 0 0 8px; font-size: 28px; }
+          p { margin: 0; color: #667085; }
+          .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+          .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; }
+          .metric span { display: block; color: #667085; font-size: 12px; }
+          .metric strong { display: block; margin-top: 6px; font-size: 24px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #d9e2ec; padding: 10px; text-align: right; font-size: 13px; }
+          th { background: #fafdff; color: #667085; }
+          @media print { body { padding: 18px; } button { display: none; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>تقرير interview 3</h1>
+          <p>وحدة القبول والمقابلات - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
+        </header>
+        <section class="metrics">
+          <div class="metric"><span>إجمالي المتقدمين</span><strong>${stats.total}</strong></div>
+          <div class="metric"><span>طلبات قيد المراجعة</span><strong>${stats.pendingDocs}</strong></div>
+          <div class="metric"><span>مواعيد مجدولة</span><strong>${stats.scheduled}</strong></div>
+          <div class="metric"><span>نتائج معتمدة</span><strong>${stats.approved}</strong></div>
+        </section>
+        <table>
+          <thead>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم الانتظار</th><th>المعدل</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <script>window.addEventListener('load', () => window.print());</script>
+      </body>
+    </html>
+  `)
+  report.document.close()
+}
 
 function App() {
   const applicantOnly = new URLSearchParams(window.location.search).get('view') === 'applicant'
@@ -308,8 +408,8 @@ function App() {
             <span className="topbar-description">{roleDescriptions[activeRole]}</span>
           </div>
           {!applicantOnly && <div className="quick-actions">
-            <button type="button"><Download size={17} /> تصدير Excel</button>
-            <button type="button"><FileText size={17} /> تقرير PDF</button>
+            <button onClick={() => exportApplicantsExcel(applicants)} type="button"><Download size={17} /> تصدير Excel</button>
+            <button onClick={() => openApplicantsPdfReport(applicants, stats)} type="button"><FileText size={17} /> تقرير PDF</button>
           </div>}
         </header>
 

@@ -66,6 +66,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -104,6 +105,39 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
     expect(screen.getByLabelText('رقم الهوية الوطنية')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'شؤون المتدربين' })).toBeNull()
+  })
+
+  it('exports applicants to an Excel-compatible CSV file', async () => {
+    const user = userEvent.setup()
+    const createObjectUrl = vi.fn(() => 'blob:interview-3-export')
+    const revokeObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /تصدير Excel/ }))
+
+    expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
+    expect(clickSpy).toHaveBeenCalled()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-export')
+  })
+
+  it('opens a printable PDF report for applicants', async () => {
+    const user = userEvent.setup()
+    const write = vi.fn()
+    const close = vi.fn()
+    vi.spyOn(window, 'open').mockReturnValue({
+      document: { write, close },
+    } as unknown as Window)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /تقرير PDF/ }))
+
+    expect(window.open).toHaveBeenCalled()
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير interview 3'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('عبدالله محمد الزهراني'))
+    expect(close).toHaveBeenCalled()
   })
 
   it('persists applicant portal registration into the internal pages', async () => {
