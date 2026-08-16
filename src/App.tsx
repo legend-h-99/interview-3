@@ -1512,7 +1512,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
     return committeeNumber ? applicantCommitteeNumber === committeeNumber : false
   })
-  const currentApplicantBelongsToCommittee = assigned.some((applicant) => applicant.id === selected.id)
+  const currentApplicantVisible = applicants.some((applicant) => applicant.id === selected.id)
   const activeApplicant = selected
   const selectedScores = normalizeScores(activeApplicant.scores)
   const selectedQuestions = getApplicantQuestionSet(activeApplicant)
@@ -1556,7 +1556,6 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
 
   const approveAndMoveNext = async () => {
     const nextApplicant =
-      assigned.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
       applicants.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
       applicants.find((applicant) => applicant.id !== activeApplicant.id)
     if (nextApplicant) {
@@ -1580,13 +1579,8 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
               setCommitteeNumber(nextCommitteeNumber)
               setTranslatorId('')
               setSelectedStaffIds([])
-              const firstAssignedApplicant = applicants.find((applicant) => {
-                const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
-                return applicantCommitteeNumber === nextCommitteeNumber
-              })
-              if (firstAssignedApplicant) {
-                setSelectedId(firstAssignedApplicant.id)
-              }
+              const firstApplicant = applicants.find((applicant) => applicant.status !== 'النتيجة معتمدة') ?? applicants[0]
+              if (firstApplicant) setSelectedId(firstApplicant.id)
             }}
           >
             <option value="">اختر رقم اللجنة</option>
@@ -1629,12 +1623,12 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
               اختيار المتقدم من قائمة الأسماء
               <select
                 aria-label="اختيار المتقدم للمقابلة"
-                disabled={assigned.length === 0}
-                value={currentApplicantBelongsToCommittee ? activeApplicant.id : ''}
+                disabled={applicants.length === 0}
+                value={currentApplicantVisible ? activeApplicant.id : ''}
                 onChange={(event) => setSelectedId(event.target.value)}
               >
-                {assigned.length === 0 && <option value="">لا يوجد متقدمون في هذه اللجنة</option>}
-                {assigned.map((applicant) => (
+                {applicants.length === 0 && <option value="">لا يوجد متقدمون</option>}
+                {applicants.map((applicant) => (
                   <option key={applicant.id} value={applicant.id}>
                     {applicant.name} - {applicant.waitingNo ?? applicant.requestNo}
                   </option>
@@ -1643,7 +1637,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             </label>
           </>
         )}
-        <ApplicantTable applicants={assigned} selectedId={activeApplicant.id} onSelect={setSelectedId} />
+        <ApplicantTable applicants={applicants} selectedId={activeApplicant.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
         <Details applicant={activeApplicant} />
