@@ -111,6 +111,32 @@ describe('Interview management system', () => {
     expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
   })
 
+  it('lets an imported applicant continue registration and then shows the waiting card', async () => {
+    const user = userEvent.setup()
+    const importedApplicant = seedApplicants.find((applicant) => applicant.id.startsWith('accepted-') && !applicant.waitingNo)
+    expect(importedApplicant).toBeTruthy()
+    window.history.pushState({}, '', '/?view=applicant')
+    render(<App />)
+
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), importedApplicant?.nationalId ?? '')
+
+    expect(await screen.findByRole('button', { name: /متابعة وإصدار رقم الانتظار/ })).toBeTruthy()
+    expect((screen.getByLabelText('الاسم الكامل') as HTMLInputElement).value).toBe(importedApplicant?.name)
+    expect(screen.queryByLabelText('بيانات المتقدم بعد التقديم')).toBeNull()
+
+    await user.clear(screen.getByLabelText('العمر'))
+    await user.type(screen.getByLabelText('العمر'), '21')
+    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
+    await user.type(screen.getByLabelText('رقم جوال إضافي'), '0557770000')
+    await user.click(screen.getByRole('button', { name: /متابعة وإصدار رقم الانتظار/ }))
+
+    expect(await screen.findByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
+    expect(screen.getByText(importedApplicant?.name ?? '')).toBeTruthy()
+    expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
+    expect(screen.queryByLabelText('الاسم الكامل')).toBeNull()
+    expect(screen.queryByText('0557770000')).toBeNull()
+  })
+
   it('opens the applicant portal directly from a dedicated link', () => {
     window.history.pushState({}, '', '/?view=applicant')
     render(<App />)

@@ -736,6 +736,7 @@ function App() {
   const [selectedId, setSelectedId] = useState(seedApplicants[0].id)
   const [selectedManagerIndex, setSelectedManagerIndex] = useState(0)
   const [nationalId, setNationalId] = useState('')
+  const [issuedApplicantId, setIssuedApplicantId] = useState('')
   const [form, setForm] = useState<ApplicantForm>(emptyApplicantForm)
 
   const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
@@ -848,6 +849,8 @@ function App() {
         `استكمال بيانات المتقدم وإصدار رقم مقابلة ${interviewNo}`,
       )
       setSelectedId(existing.id)
+      setIssuedApplicantId(existing.id)
+      setNationalId(applicantNationalId)
       return
     }
     const response = await fetch(apiUrl('/api/applicants'), {
@@ -870,7 +873,14 @@ function App() {
       const data = (await response.json()) as { applicant: Applicant }
       setApplicants((current) => [data.applicant, ...current.filter((item) => item.id !== data.applicant.id)])
       setSelectedId(data.applicant.id)
+      setIssuedApplicantId(data.applicant.id)
+      setNationalId(data.applicant.nationalId)
     }
+  }
+
+  const setApplicantLookup = (value: string) => {
+    setNationalId(value)
+    setIssuedApplicantId('')
   }
 
   const resetDemo = async () => {
@@ -982,8 +992,9 @@ function App() {
         {role === 'applicant' && (
           <ApplicantView
             applicants={applicants}
+            issuedApplicantId={issuedApplicantId}
             nationalId={nationalId}
-            setNationalId={setNationalId}
+            setNationalId={setApplicantLookup}
             form={form}
             setForm={setForm}
             registerApplicant={registerApplicant}
@@ -1687,8 +1698,9 @@ function YesNoField({ label, value, onChange }: { label: string; value: YesNo; o
   )
 }
 
-function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, registerApplicant }: {
+function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalId, form, setForm, registerApplicant }: {
   applicants: Applicant[]
+  issuedApplicantId: string
   nationalId: string
   setNationalId: (value: string) => void
   form: { nationalId: string; name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }
@@ -1697,6 +1709,9 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
 }) {
   const lookup = nationalId.trim()
   const found = applicants.find((item) => item.nationalId === lookup || (lookup.length > 1 && item.name.includes(lookup)))
+  const issuedApplicant = applicants.find((item) => item.id === issuedApplicantId)
+  const publicApplicant = issuedApplicant ?? (found?.waitingNo ? found : undefined)
+  const showRegistrationForm = !publicApplicant
 
   useEffect(() => {
     if (!found) {
@@ -1736,12 +1751,12 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
         <div className="qr-box"><QrCode size={82} /><span>رابط التسجيل المباشر</span></div>
         <div className="section-title"><h2>البحث أو التسجيل</h2><Search size={21} /></div>
         <label>رقم الهوية الوطنية أو الاسم<input value={nationalId} onChange={(event) => setNationalId(event.target.value)} placeholder="مثال: 1122595406 أو عماش" /></label>
-        {found && (
+        {publicApplicant && (
           <div className="found">
-            <PublicApplicantStatus applicant={found} />
+            <PublicApplicantStatus applicant={publicApplicant} />
           </div>
         )}
-        {!found && (
+        {showRegistrationForm && (
           <div className="form-grid">
             <label>رقم الهوية<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} /></label>
             <label>الاسم الكامل<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
@@ -1751,7 +1766,7 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
             <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
             <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
             <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
-            <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> التحقق وإصدار رقم المقابلة</button>
+            <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> {found ? 'متابعة وإصدار رقم الانتظار' : 'التحقق وإصدار رقم المقابلة'}</button>
           </div>
         )}
       </section>
