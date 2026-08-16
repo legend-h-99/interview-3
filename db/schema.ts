@@ -20,10 +20,17 @@ CREATE TABLE IF NOT EXISTS applicants (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS active_sessions (
+  id TEXT PRIMARY KEY,
+  last_seen TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+);
 `
 
 export const indexes = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_national_id ON applicants (national_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_request_no ON applicants (request_no)`,
   `CREATE INDEX IF NOT EXISTS idx_applicants_status ON applicants (status)`,
+  `CREATE INDEX IF NOT EXISTS idx_active_sessions_expires_at ON active_sessions (expires_at)`,
 ]

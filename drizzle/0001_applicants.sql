@@ -23,3 +23,11 @@ CREATE TABLE IF NOT EXISTS applicants (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_national_id ON applicants (national_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_request_no ON applicants (request_no);
 CREATE INDEX IF NOT EXISTS idx_applicants_status ON applicants (status);
+
+CREATE TABLE IF NOT EXISTS active_sessions (
+  id TEXT PRIMARY KEY,
+  last_seen TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_sessions_expires_at ON active_sessions (expires_at);

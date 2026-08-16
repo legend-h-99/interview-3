@@ -180,6 +180,7 @@ const workerSource = `
 const files = new Map(${JSON.stringify(files.map((file) => [file.path, file]))});
 const seedApplicants = ${JSON.stringify(seedApplicants)};
 const defaultInterviewScores = ${JSON.stringify(defaultInterviewScores)};
+const maxConcurrentUsers = 150;
 const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   id TEXT PRIMARY KEY,
   national_id TEXT NOT NULL UNIQUE,
@@ -214,10 +215,16 @@ const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`)};
+const sessionsSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS active_sessions (
+  id TEXT PRIMARY KEY,
+  last_seen TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+)`)};
 const indexSql = [
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_national_id ON applicants (national_id)',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_applicants_request_no ON applicants (request_no)',
   'CREATE INDEX IF NOT EXISTS idx_applicants_status ON applicants (status)',
+  'CREATE INDEX IF NOT EXISTS idx_active_sessions_expires_at ON active_sessions (expires_at)',
 ];
 const migrationSql = [
   'ALTER TABLE applicants ADD COLUMN committee_number TEXT',
@@ -270,7 +277,7 @@ function corsHeaders(request) {
   return {
     'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://legend-h-99.github.io',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Allow-Headers': 'content-type, x-session-id',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -369,6 +376,7 @@ async function ensureDb(env) {
   if (!db) throw new Error('D1 binding DB is unavailable');
   await db.batch([
     db.prepare(schemaSql),
+    db.prepare(sessionsSql),
     ...indexSql.map((statement) => db.prepare(statement)),
     db.prepare('PRAGMA optimize'),
   ]);
@@ -381,6 +389,22 @@ async function ensureDb(env) {
   }
   await db.batch(seedApplicants.map((applicant) => insertApplicantStatement(db, applicant)));
   return db;
+}
+
+async function touchSession(env, request) {
+  const db = await ensureDb(env);
+  await db.prepare("DELETE FROM active_sessions WHERE expires_at <= datetime('now')").run();
+  const fallbackId = request.headers.get('cf-connecting-ip') || 'anonymous';
+  const sessionId = request.headers.get('x-session-id') || \`fallback-\${fallbackId}\`;
+  const existing = await db.prepare('SELECT id FROM active_sessions WHERE id = ?').bind(sessionId).first();
+  const current = await db.prepare("SELECT COUNT(*) AS total FROM active_sessions WHERE expires_at > datetime('now')").first();
+  const active = Number(current?.total || 0);
+  if (!existing && active >= maxConcurrentUsers) {
+    return json({ error: 'capacity_reached', active, max: maxConcurrentUsers }, { status: 429 });
+  }
+  await db.prepare("INSERT OR REPLACE INTO active_sessions (id, last_seen, expires_at) VALUES (?, CURRENT_TIMESTAMP, datetime('now', '+90 seconds'))").bind(sessionId).run();
+  const next = await db.prepare("SELECT COUNT(*) AS total FROM active_sessions WHERE expires_at > datetime('now')").first();
+  return json({ sessionId, active: Number(next?.total || 0), max: maxConcurrentUsers });
 }
 
 async function listApplicants(env) {
@@ -513,6 +537,11 @@ async function handleApi(request, env) {
   try {
     const url = new URL(request.url);
     let response;
+    if (url.pathname === '/api/session' && request.method === 'POST') response = await touchSession(env, request);
+    if (!response) {
+      const sessionResponse = await touchSession(env, request);
+      if (sessionResponse.status === 429) return withCors(sessionResponse, request);
+    }
     if (url.pathname === '/api/applicants' && request.method === 'GET') response = await listApplicants(env);
     if (url.pathname === '/api/applicants' && request.method === 'POST') response = await createApplicant(env, request);
     const match = url.pathname.match(/^\\/api\\/applicants\\/([^/]+)$/);

@@ -389,11 +389,39 @@ const emptyApplicantForm: ApplicantForm = {
 }
 
 const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
+const maxConcurrentUsers = 150
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'طريقة التسجيل', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
+let fallbackSessionId = ''
+
+function sessionId() {
+  const storageKey = 'interview-3-session-id'
+  const nextId = () => crypto.randomUUID?.() ?? `session-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  try {
+    const storage = window.localStorage
+    const existing = typeof storage?.getItem === 'function' ? storage.getItem(storageKey) : ''
+    if (existing) return existing
+    if (typeof storage?.setItem !== 'function') {
+      if (!fallbackSessionId) fallbackSessionId = nextId()
+      return fallbackSessionId
+    }
+    const next = nextId()
+    storage.setItem(storageKey, next)
+    return next
+  } catch {
+    if (!fallbackSessionId) fallbackSessionId = nextId()
+    return fallbackSessionId
+  }
+}
+
+function apiFetch(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers)
+  headers.set('x-session-id', sessionId())
+  return fetch(apiUrl(path), { ...init, headers })
+}
 
 function csvCell(value: string | number | undefined) {
   const text = String(value ?? '')
@@ -722,7 +750,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <section class="pdf-visuals">${charts}</section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>طريقة التسجيل</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -761,6 +789,7 @@ function App() {
   const [issuedApplicantId, setIssuedApplicantId] = useState('')
   const [applicantSubmitState, setApplicantSubmitState] = useState({ loading: false, message: '' })
   const [form, setForm] = useState<ApplicantForm>(emptyApplicantForm)
+  const [capacityState, setCapacityState] = useState({ active: 0, max: maxConcurrentUsers, blocked: false })
 
   const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
   const stats = useMemo(() => {
@@ -774,7 +803,11 @@ function App() {
   const selectedManager = collegeManagers[selectedManagerIndex] ?? collegeManagers[0]
 
   const refreshApplicants = async () => {
-    const response = await fetch(apiUrl('/api/applicants'))
+    const response = await apiFetch('/api/applicants')
+    if (response.status === 429) {
+      setCapacityState((current) => ({ ...current, blocked: true }))
+      throw new Error('Platform capacity reached')
+    }
     if (!response.ok) throw new Error('Unable to load applicants')
     const data = (await response.json()) as { applicants: Applicant[] }
     setApplicants(data.applicants)
@@ -782,7 +815,23 @@ function App() {
   }
 
   useEffect(() => {
+    const touchSession = async () => {
+      const response = await apiFetch('/api/session', { method: 'POST' })
+      if (response.status === 429) {
+        setCapacityState({ active: maxConcurrentUsers, max: maxConcurrentUsers, blocked: true })
+        return
+      }
+      if (response.ok) {
+        const data = (await response.json()) as { active: number; max: number }
+        setCapacityState({ active: data.active, max: data.max, blocked: false })
+      }
+    }
+    touchSession().catch(() => undefined)
+    const interval = window.setInterval(() => {
+      touchSession().catch(() => undefined)
+    }, 30000)
     refreshApplicants().catch(() => setApplicants(seedApplicants))
+    return () => window.clearInterval(interval)
   }, [])
 
   const updateApplicant = async (id: string, patch: Partial<Applicant>, audit: string) => {
@@ -792,7 +841,7 @@ function App() {
         : applicant,
     )
     setApplicants(next)
-    const response = await fetch(apiUrl(`/api/applicants/${id}`), {
+    const response = await apiFetch(`/api/applicants/${id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ patch, audit }),
@@ -886,7 +935,7 @@ function App() {
       return
     }
     try {
-      const response = await fetch(apiUrl('/api/applicants'), {
+      const response = await apiFetch('/api/applicants', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -902,6 +951,10 @@ function App() {
           gpa: 0,
         }),
       })
+      if (response.status === 429) {
+        setCapacityState({ active: maxConcurrentUsers, max: maxConcurrentUsers, blocked: true })
+        throw new Error('Platform capacity reached')
+      }
       if (!response.ok) throw new Error('Unable to register applicant')
       const data = (await response.json()) as { applicant: Applicant }
       setApplicants((current) => [data.applicant, ...current.filter((item) => item.id !== data.applicant.id)])
@@ -921,7 +974,7 @@ function App() {
   }
 
   const resetDemo = async () => {
-    await fetch(apiUrl('/api/reset'), { method: 'POST' })
+    await apiFetch('/api/reset', { method: 'POST' })
     setApplicants(seedApplicants)
     setSelectedId(seedApplicants[0].id)
   }
@@ -936,6 +989,11 @@ function App() {
 
   return (
     <main className="app" dir="rtl">
+      {capacityState.blocked && (
+        <div className="capacity-banner" role="alert">
+          المنصة وصلت للحد الأقصى {capacityState.max} مستخدم في نفس الوقت. حاول مرة أخرى بعد قليل.
+        </div>
+      )}
       {!applicantOnly && <aside className="sidebar">
         <div className="brand">
           <ShieldCheck size={30} />
@@ -968,6 +1026,7 @@ function App() {
             <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
             <span className="institution-line">{collegeProfile.collegeName} · {collegeProfile.departmentName}</span>
             <span className="institution-line">رئيس القسم / رئيس اللجنة: {collegeProfile.departmentHeadAndCommitteeChair}</span>
+            <span className="institution-line">الحد الأقصى للاستخدام المتزامن: {capacityState.max} مستخدم</span>
             <span className="topbar-description">{roleDescriptions[activeRole]}</span>
           </div>
           {!applicantOnly && <div className="quick-actions">
@@ -1238,7 +1297,7 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
             <th>الجنسية</th>
             <th>الحالة</th>
             <th>رقم الانتظار</th>
-            <th>طريقة التسجيل</th>
+            <th>المصدر</th>
             <th>نوع الشهادة</th>
           </tr>
         </thead>
@@ -1251,7 +1310,7 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
               <td data-label="الجنسية">{applicant.nationality}</td>
               <td data-label="الحالة"><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
               <td data-label="رقم الانتظار">{applicant.waitingNo ?? 'لم يصدر'}</td>
-              <td data-label="طريقة التسجيل">{registrationSourceLabel(applicant.source)}</td>
+              <td data-label="المصدر">{registrationSourceLabel(applicant.source)}</td>
               <td data-label="نوع الشهادة">{applicant.certificateType}</td>
             </tr>
           ))}
@@ -1292,7 +1351,7 @@ function Details({ applicant, hideInterviewPageSections = false }: { applicant: 
         <Info label="تاريخ التخرج" value={applicant.graduationDate} />
         <Info label="رقم الجوال" value={applicant.phone} />
         <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
-        <Info label="طريقة التسجيل" value={registrationSourceLabel(applicant.source)} />
+        <Info label="المصدر" value={registrationSourceLabel(applicant.source)} />
         {applicant.admissionStatus && <Info label="حالة القبول" value={applicant.admissionStatus} />}
         {applicant.program && <Info label="البرنامج" value={applicant.program} />}
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
