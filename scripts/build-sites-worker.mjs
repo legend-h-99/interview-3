@@ -176,6 +176,7 @@ const seedApplicants = [
 const workerSource = `
 const files = new Map(${JSON.stringify(files.map((file) => [file.path, file]))});
 const seedApplicants = ${JSON.stringify(seedApplicants)};
+const defaultInterviewScores = ${JSON.stringify(defaultInterviewScores)};
 const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   id TEXT PRIMARY KEY,
   national_id TEXT NOT NULL UNIQUE,
@@ -245,6 +246,11 @@ function json(data, init = {}) {
     ...init,
     headers: { 'content-type': 'application/json; charset=utf-8', ...(init.headers || {}) },
   });
+}
+
+function toNumber(value, fallback = 0) {
+  const number = Number(String(value ?? '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(number) ? number : fallback;
 }
 
 const allowedOrigins = new Set([
@@ -392,13 +398,13 @@ async function createApplicant(env, request) {
     waitingNo,
     name: body.name,
     nationality: body.nationality || '',
-    age: Number(body.age || 0),
+    age: toNumber(body.age),
     certificateType: body.certificateType || body.qualification || '',
     graduationDate: body.graduationDate || '',
     phone: body.phone,
     extraPhone: body.extraPhone || '',
     qualification: body.qualification || body.certificateType || '',
-    gpa: Number(body.gpa || 0),
+    gpa: toNumber(body.gpa),
     source: 'direct',
     status: 'تم إصدار رقم الانتظار',
     committeeTrainerIds: [],

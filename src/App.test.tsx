@@ -97,10 +97,10 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('الاسم الكامل'), 'مازن صالح القحطاني')
     await user.clear(screen.getByLabelText('الجنسية'))
     await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
-    await user.type(screen.getByLabelText('العمر'), '21')
-    await user.type(screen.getByLabelText('نوع الشهادة'), 'ثانوية عامة')
+    await user.type(screen.getByLabelText('العمر'), '٢١ سنة')
+    await user.type(screen.getByLabelText('نوع الشهادة'), 'High school / ثانوية عامة')
     await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
-    await user.type(screen.getByLabelText('رقم الجوال'), '0557778888')
+    await user.type(screen.getByLabelText('رقم الجوال'), '٠٥٥7778888')
     await user.type(screen.getByLabelText('رقم جوال إضافي'), '0557779999')
     await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
 

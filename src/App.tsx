@@ -206,6 +206,12 @@ function normalizeDigits(value: string) {
   })
 }
 
+function flexibleNumber(value: string | number | undefined) {
+  const normalized = normalizeDigits(String(value ?? '')).replace(/[^0-9.-]/g, '')
+  const number = Number(normalized)
+  return Number.isFinite(number) ? number : 0
+}
+
 function acceptedToApplicant(item: AcceptedApplicant, index: number): Applicant {
   return {
     id: `accepted-${item.nationalId}`,
@@ -856,7 +862,7 @@ function App() {
           nationalId: applicantNationalId,
           name: form.name,
           nationality: form.nationality,
-          age: Number(form.age),
+          age: flexibleNumber(form.age),
           certificateType: form.certificateType,
           graduationDate: form.graduationDate,
           phone: form.phone,
@@ -882,7 +888,7 @@ function App() {
           nationalId: applicantNationalId,
           name: form.name,
           nationality: form.nationality,
-          age: Number(form.age),
+          age: flexibleNumber(form.age),
           certificateType: form.certificateType,
           graduationDate: form.graduationDate,
           phone: form.phone,
