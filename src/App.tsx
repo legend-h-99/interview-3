@@ -1586,6 +1586,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
   const [translatorId, setTranslatorId] = useState(selected.translatorId ?? '')
   const [editForm, setEditForm] = useState<ApplicantForm>(applicantToForm(selected))
+  const [isChoosingApplicant, setIsChoosingApplicant] = useState(true)
   const selectedStaff = selectedStaffIds
     .map((id) => staffMembers.find((member) => member.id === id))
     .filter((member): member is StaffMember => Boolean(member))
@@ -1660,6 +1661,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
               setCommitteeNumber(nextCommitteeNumber)
               setTranslatorId('')
               setSelectedStaffIds([])
+              setIsChoosingApplicant(true)
               const firstApplicant = applicants.find((applicant) => applicant.status !== 'النتيجة معتمدة') ?? applicants[0]
               if (firstApplicant) setSelectedId(firstApplicant.id)
             }}
@@ -1700,25 +1702,36 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
                 <Info label="اللجنة المختارة" value={`لجنة ${committeeNumber}`} />
               </div>
             )}
-            <label className="list-select">
-              اختيار المتقدم من قائمة الأسماء
-              <select
-                aria-label="اختيار المتقدم للمقابلة"
-                disabled={applicants.length === 0}
-                value={currentApplicantVisible ? activeApplicant.id : ''}
-                onChange={(event) => setSelectedId(event.target.value)}
-              >
-                {applicants.length === 0 && <option value="">لا يوجد متقدمون</option>}
-                {applicants.map((applicant) => (
-                  <option key={applicant.id} value={applicant.id}>
-                    {applicant.name} - {applicant.waitingNo ?? applicant.requestNo}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {isChoosingApplicant ? (
+              <label className="list-select">
+                اختيار المتقدم من قائمة الأسماء
+                <select
+                  aria-label="اختيار المتقدم للمقابلة"
+                  disabled={applicants.length === 0}
+                  value={currentApplicantVisible ? activeApplicant.id : ''}
+                  onChange={(event) => {
+                    setSelectedId(event.target.value)
+                    setIsChoosingApplicant(false)
+                  }}
+                >
+                  {applicants.length === 0 && <option value="">لا يوجد متقدمون</option>}
+                  {applicants.map((applicant) => (
+                    <option key={applicant.id} value={applicant.id}>
+                      {applicant.name} - {applicant.waitingNo ?? applicant.requestNo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="selected-applicant-card" aria-label="المتقدم المختار للمقابلة">
+                <span>المتقدم المختار</span>
+                <strong>{activeApplicant.name}</strong>
+                <small>{activeApplicant.waitingNo ?? activeApplicant.requestNo}</small>
+                <button onClick={() => setIsChoosingApplicant(true)} type="button">تغيير المتقدم</button>
+              </div>
+            )}
           </>
         )}
-        <ApplicantTable applicants={applicants} selectedId={activeApplicant.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
         <Details applicant={activeApplicant} hideInterviewPageSections />

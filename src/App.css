@@ -243,6 +243,38 @@ button svg,
   color: var(--color-text-primary);
 }
 
+.selected-applicant-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgb(15 118 110 / 0.24);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgb(15 118 110 / 0.10), rgb(15 107 143 / 0.05)), var(--color-bg-surface);
+}
+
+.selected-applicant-card span,
+.selected-applicant-card small {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.selected-applicant-card strong {
+  color: var(--color-text-primary);
+  font-size: 20px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.selected-applicant-card button {
+  justify-self: start;
+  padding: 9px 14px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-action-primary);
+  font-weight: 800;
+}
+
 .check-list {
   display: grid;
   gap: 8px;

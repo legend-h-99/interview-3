@@ -360,8 +360,10 @@ describe('Interview management system', () => {
     expect(screen.getByText('27548')).toBeTruthy()
     expect(screen.getAllByText(/31067/).length).toBeGreaterThan(0)
     expect(screen.getAllByText('لجنة 1').length).toBeGreaterThan(0)
-    expect(screen.getByText('عبدالله محمد الفيفي')).toBeTruthy()
     await user.selectOptions(applicantSelect, 'a1')
+    expect(screen.getByLabelText('المتقدم المختار للمقابلة')).toBeTruthy()
+    expect(screen.queryByText('سلمان فهد المطيري')).toBeNull()
+    expect(screen.queryByText('عبدالله محمد الفيفي')).toBeNull()
 
     fireEvent.change(screen.getByLabelText('الإشارة'), { target: { value: '22' } })
     fireEvent.change(screen.getByLabelText('المظهر العام'), { target: { value: '4' } })
@@ -375,12 +377,12 @@ describe('Interview management system', () => {
     expect(within(screen.getByLabelText('درجة المتقدم الحالية')).getByText('45 / 50')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /اعتماد تقييم المتقدم والانتقال للتالي/ }))
 
-    expect(screen.getAllByText('النتيجة معتمدة').length).toBeGreaterThan(0)
     expect(screen.queryByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' })).toBeNull()
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
     const detailsPanel = screen.getByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' }).closest('.panel')
     expect(detailsPanel).toBeTruthy()
+    expect(within(detailsPanel as HTMLElement).getByText('النتيجة معتمدة')).toBeTruthy()
     expect(within(detailsPanel as HTMLElement).getByText('مرشح مناسب للقسم.')).toBeTruthy()
     expect(within(detailsPanel as HTMLElement).getByText('45 من 50')).toBeTruthy()
   })
@@ -391,7 +393,7 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
     await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
-    await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
+    await user.selectOptions(screen.getByLabelText('اختيار المتقدم للمقابلة'), 'a1')
     const editor = screen.getByLabelText('تعديل بيانات المتقدم من اللجنة')
 
     await user.clear(within(editor).getByLabelText('الاسم الكامل'))
@@ -410,7 +412,7 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
     await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
-    await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
+    await user.selectOptions(screen.getByLabelText('اختيار المتقدم للمقابلة'), 'a1')
 
     expect(screen.queryByRole('heading', { name: 'الوثائق' })).toBeNull()
     expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
