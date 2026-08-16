@@ -1,8 +1,11 @@
 import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { extname, join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const distDir = new URL('../dist/', import.meta.url)
 const serverDir = new URL('../dist/server/', import.meta.url)
+const distPath = fileURLToPath(distDir)
+const serverPath = fileURLToPath(serverDir)
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -25,7 +28,7 @@ async function collectFiles(dirUrl, rootUrl = dirUrl) {
       continue
     }
     const buffer = await readFile(entryUrl)
-    const filePath = `/${relative(rootUrl.pathname, entryUrl.pathname)}`
+    const filePath = `/${relative(fileURLToPath(rootUrl), fileURLToPath(entryUrl))}`
     files.push({
       path: filePath,
       type: contentTypes[extname(entry.name)] ?? 'application/octet-stream',
@@ -540,6 +543,6 @@ export default {
 `
 
 await mkdir(serverDir, { recursive: true })
-await writeFile(join(serverDir.pathname, 'index.js'), workerSource.trimStart())
-await mkdir(join(distDir.pathname, '.openai'), { recursive: true })
-await copyFile(new URL('../.openai/hosting.json', import.meta.url), join(distDir.pathname, '.openai/hosting.json'))
+await writeFile(join(serverPath, 'index.js'), workerSource.trimStart())
+await mkdir(join(distPath, '.openai'), { recursive: true })
+await copyFile(new URL('../.openai/hosting.json', import.meta.url), join(distPath, '.openai/hosting.json'))
