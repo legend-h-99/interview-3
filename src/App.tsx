@@ -808,7 +808,8 @@ function App() {
   }
 
   const submitEvaluation = async (id: string) => {
-    const score = calculateScore(selected)
+    const evaluatedApplicant = applicants.find((applicant) => applicant.id === id) ?? selected
+    const score = calculateScore(evaluatedApplicant)
     await updateApplicant(
       id,
       { status: 'النتيجة معتمدة', finalResult: score >= 35 ? 'مقبول' : 'احتياط' },
@@ -1469,59 +1470,61 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const selectedStaff = selectedStaffIds
     .map((id) => staffMembers.find((member) => member.id === id))
     .filter((member): member is StaffMember => Boolean(member))
-  const selectedScores = normalizeScores(selected.scores)
-  const selectedQuestions = getApplicantQuestionSet(selected)
-  const selectedTotalScore = calculateScore(selected)
   const assigned = applicants.filter((applicant) => {
     const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
     return committeeNumber ? applicantCommitteeNumber === committeeNumber : false
   })
+  const currentApplicantBelongsToCommittee = assigned.some((applicant) => applicant.id === selected.id)
+  const activeApplicant = selected
+  const selectedScores = normalizeScores(activeApplicant.scores)
+  const selectedQuestions = getApplicantQuestionSet(activeApplicant)
+  const selectedTotalScore = calculateScore(activeApplicant)
   const analyticsApplicants = committeeNumber ? assigned : applicants
 
   useEffect(() => {
-    setTranslatorId(committeeNumber ? selected.translatorId ?? '' : '')
-    setSelectedStaffIds(committeeNumber ? selected.committeeTrainerIds ?? [] : [])
-    setEditForm(applicantToForm(selected))
-  }, [committeeNumber, selected.id, selected.committeeTrainerIds, selected.translatorId])
+    setTranslatorId(committeeNumber ? activeApplicant.translatorId ?? '' : '')
+    setSelectedStaffIds(committeeNumber ? activeApplicant.committeeTrainerIds ?? [] : [])
+    setEditForm(applicantToForm(activeApplicant))
+  }, [activeApplicant.id, activeApplicant.committeeTrainerIds, activeApplicant.translatorId, committeeNumber])
 
   const selectTranslator = (value: string) => {
     setTranslatorId(value)
-    updateApplicant(selected.id, { translatorId: value || undefined }, value ? 'اختيار مترجم المقابلة' : 'إلغاء مترجم المقابلة')
+    updateApplicant(activeApplicant.id, { translatorId: value || undefined }, value ? 'اختيار مترجم المقابلة' : 'إلغاء مترجم المقابلة')
   }
 
   const toggleStaff = (id: string) => {
     const next = selectedStaffIds.includes(id) ? selectedStaffIds.filter((item) => item !== id) : [...selectedStaffIds, id]
     setSelectedStaffIds(next)
-    updateApplicant(selected.id, { committeeTrainerIds: next }, 'اختيار مدربي اللجنة')
+    updateApplicant(activeApplicant.id, { committeeTrainerIds: next }, 'اختيار مدربي اللجنة')
   }
 
   const setScore = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'signLanguage' | 'appearance' | 'responseSpeed'>, value: number) => {
-    updateApplicant(selected.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
+    updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
   }
 
   const setQuestionScore = (index: number, value: number) => {
     const nextScores = [...selectedScores.questionScores]
     nextScores[index] = Math.min(3, Math.max(0, value))
-    updateApplicant(selected.id, { scores: { ...selectedScores, questionScores: nextScores, generalInfo: nextScores.reduce((total, score) => total + score, 0) }, status: 'المقابلة جارية' }, 'حفظ درجة سؤال المعلومات العامة')
+    updateApplicant(activeApplicant.id, { scores: { ...selectedScores, questionScores: nextScores, generalInfo: nextScores.reduce((total, score) => total + score, 0) }, status: 'المقابلة جارية' }, 'حفظ درجة سؤال المعلومات العامة')
   }
 
   const setYesNo = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'hasAssociatedDifficulty' | 'weakHearing' | 'knowsSignLanguage' | 'weakMentalAbilities' | 'distinguished'>, value: YesNo) => {
-    updateApplicant(selected.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
+    updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
   }
 
   const saveApplicantData = () => {
-    updateApplicant(selected.id, formToApplicantPatch(editForm), 'تعديل بيانات المتقدم من اللجنة')
+    updateApplicant(activeApplicant.id, formToApplicantPatch(editForm), 'تعديل بيانات المتقدم من اللجنة')
   }
 
   const approveAndMoveNext = async () => {
     const nextApplicant =
-      assigned.find((applicant) => applicant.id !== selected.id && applicant.status !== 'النتيجة معتمدة') ??
-      applicants.find((applicant) => applicant.id !== selected.id && applicant.status !== 'النتيجة معتمدة') ??
-      applicants.find((applicant) => applicant.id !== selected.id)
-    await submitEvaluation(selected.id)
+      assigned.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
+      applicants.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
+      applicants.find((applicant) => applicant.id !== activeApplicant.id)
     if (nextApplicant) {
       setSelectedId(nextApplicant.id)
     }
+    await submitEvaluation(activeApplicant.id)
   }
 
   return (
@@ -1584,12 +1587,28 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
                 <Info label="اللجنة المختارة" value={`لجنة ${committeeNumber}`} />
               </div>
             )}
+            <label className="list-select">
+              اختيار المتقدم من قائمة الأسماء
+              <select
+                aria-label="اختيار المتقدم للمقابلة"
+                disabled={assigned.length === 0}
+                value={currentApplicantBelongsToCommittee ? activeApplicant.id : ''}
+                onChange={(event) => setSelectedId(event.target.value)}
+              >
+                {assigned.length === 0 && <option value="">لا يوجد متقدمون في هذه اللجنة</option>}
+                {assigned.map((applicant) => (
+                  <option key={applicant.id} value={applicant.id}>
+                    {applicant.name} - {applicant.waitingNo ?? applicant.requestNo}
+                  </option>
+                ))}
+              </select>
+            </label>
           </>
         )}
-        <ApplicantTable applicants={assigned} selectedId={selected.id} onSelect={setSelectedId} />
+        <ApplicantTable applicants={assigned} selectedId={activeApplicant.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
-        <Details applicant={selected} />
+        <Details applicant={activeApplicant} />
         <section className="inline-editor" aria-label="تعديل بيانات المتقدم من اللجنة">
           <div className="section-title">
             <h2>تعديل بيانات المتقدم</h2>
@@ -1611,9 +1630,9 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
         </section>
         <div className="score-form">
           <div className="score-summary" aria-label="درجة المتقدم الحالية">
-            <span>درجة المتقدم</span>
+            <span>درجة المتقدم قبل الاعتماد</span>
             <strong>{selectedTotalScore} / 50</strong>
-            <small>{selected.finalResult ? `النتيجة: ${selected.finalResult}` : 'تظهر للمدرب قبل الاعتماد وبعده'}</small>
+            <small>{activeApplicant.finalResult ? `تم اعتماد المدرب: ${activeApplicant.finalResult}` : 'راجع الدرجة ثم اضغط اعتماد التقييم للانتقال للمتقدم التالي'}</small>
           </div>
           <Range label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
           <Range label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />
@@ -1638,7 +1657,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             <YesNoField label="هل لديه ضعف عام بالقدرات العقلية والاستيعاب" value={selectedScores.weakMentalAbilities} onChange={(value) => setYesNo('weakMentalAbilities', value)} />
             <YesNoField label="هل المتقدم متميز" value={selectedScores.distinguished} onChange={(value) => setYesNo('distinguished', value)} />
           </div>
-          <textarea value={selected.notes} onChange={(event) => updateApplicant(selected.id, { notes: event.target.value }, 'تحديث ملاحظات المقابلة')} placeholder="ملاحظات المقيم" />
+          <textarea value={activeApplicant.notes} onChange={(event) => updateApplicant(activeApplicant.id, { notes: event.target.value }, 'تحديث ملاحظات المقابلة')} placeholder="ملاحظات المقيم" />
         </div>
         <div className="actions">
           <button onClick={approveAndMoveNext} type="button"><CheckCircle2 size={17} /> اعتماد تقييم المتقدم والانتقال للتالي</button>
