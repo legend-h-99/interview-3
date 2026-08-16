@@ -105,10 +105,10 @@ describe('Interview management system', () => {
     await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
 
     expect(await screen.findByText('مازن صالح القحطاني')).toBeTruthy()
-    expect(screen.getByText('REQ-2026-0034')).toBeTruthy()
-    expect(screen.getByText('0557779999')).toBeTruthy()
     expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
-    expect(screen.getByText('تم إصدار رقم الانتظار')).toBeTruthy()
+    expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
+    expect(screen.queryByText('0557779999')).toBeNull()
+    expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
   })
 
   it('opens the applicant portal directly from a dedicated link', () => {
@@ -221,8 +221,9 @@ describe('Interview management system', () => {
     await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
 
     expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
-    expect(screen.getByText('REQ-2026-0034')).toBeTruthy()
     expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
+    expect(screen.queryByText('0551113333')).toBeNull()
 
     unmount()
     window.history.pushState({}, '', '/')
@@ -256,8 +257,10 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), '1012345678')
 
     expect(screen.getAllByText('عبدالله محمد الزهراني').length).toBeGreaterThan(0)
-    expect(screen.getByText('REQ-2026-0001')).toBeTruthy()
-    expect(screen.getByLabelText('الاسم الكامل')).toBeTruthy()
+    expect(screen.getByText('W-014')).toBeTruthy()
+    expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
+    expect(screen.queryByText('REQ-2026-0001')).toBeNull()
+    expect(screen.queryByLabelText('الاسم الكامل')).toBeNull()
   })
 
   it('approves documents and issues a waiting number from trainee affairs', async () => {
@@ -290,7 +293,7 @@ describe('Interview management system', () => {
     expect(screen.getAllByText('بانتظار المقابلة').length).toBeGreaterThan(0)
   })
 
-  it('records committee scores and department approval flow', async () => {
+  it('records committee scores, approves immediately, and moves to the next applicant', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -316,17 +319,36 @@ describe('Interview management system', () => {
     await user.click(screen.getAllByRole('radio', { name: 'لا' })[0])
     await user.click(screen.getAllByRole('radio', { name: 'نعم' })[2])
     await user.type(screen.getByPlaceholderText('ملاحظات المقيم'), 'مرشح مناسب للقسم.')
-    await user.click(screen.getByRole('button', { name: /اعتماد تقييم المتقدم/ }))
+    expect(within(screen.getByLabelText('درجة المتقدم الحالية')).getByText('45 / 50')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /اعتماد تقييم المتقدم والانتقال للتالي/ }))
 
-    expect(screen.getAllByText('بانتظار اعتماد رئيس القسم').length).toBeGreaterThan(0)
-
+    expect(screen.getAllByText('النتيجة معتمدة').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' })).toBeNull()
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
+    await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
     const detailsPanel = screen.getByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' }).closest('.panel')
     expect(detailsPanel).toBeTruthy()
     expect(within(detailsPanel as HTMLElement).getByText('مرشح مناسب للقسم.')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: /اعتماد النتيجة النهائية/ }))
+    expect(within(detailsPanel as HTMLElement).getByText('45 من 50')).toBeTruthy()
+  })
 
-    expect(screen.getAllByText('النتيجة معتمدة').length).toBeGreaterThan(0)
+  it('lets the committee edit applicant data before approving', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
+    await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
+    const editor = screen.getByLabelText('تعديل بيانات المتقدم من اللجنة')
+
+    await user.clear(within(editor).getByLabelText('الاسم الكامل'))
+    await user.type(within(editor).getByLabelText('الاسم الكامل'), 'عبدالله محمد الزهراني المعدل')
+    await user.clear(within(editor).getByLabelText('رقم الجوال'))
+    await user.type(within(editor).getByLabelText('رقم الجوال'), '0550001111')
+    await user.click(screen.getByRole('button', { name: /حفظ تعديل البيانات/ }))
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني المعدل' })).toBeTruthy()
+    expect(screen.getByText('0550001111')).toBeTruthy()
   })
 
   it('shows fixed math and English interview questions for the selected applicant', async () => {

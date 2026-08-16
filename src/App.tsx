@@ -75,6 +75,10 @@ type Applicant = {
   audit: string[]
 }
 
+type ApplicantForm = Pick<Applicant, 'nationalId' | 'name' | 'nationality' | 'certificateType' | 'graduationDate' | 'phone' | 'extraPhone'> & {
+  age: string
+}
+
 type Committee = {
   id: string
   number: string
@@ -356,6 +360,17 @@ const defaultInterviewScores = {
   distinguished: '' as YesNo,
 }
 
+const emptyApplicantForm: ApplicantForm = {
+  nationalId: '',
+  name: '',
+  nationality: 'سعودي',
+  age: '',
+  certificateType: '',
+  graduationDate: '',
+  phone: '',
+  extraPhone: '',
+}
+
 const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
@@ -402,6 +417,33 @@ function formatQuestionsForExport(applicant: Applicant, category: InterviewQuest
     .filter((question) => question.category === category)
     .map((question) => `${question.prompt} الإجابة: ${question.answer}`)
     .join(' | ')
+}
+
+function applicantToForm(applicant: Applicant): ApplicantForm {
+  return {
+    nationalId: applicant.nationalId,
+    name: applicant.name,
+    nationality: applicant.nationality || 'سعودي',
+    age: applicant.age ? String(applicant.age) : '',
+    certificateType: applicant.certificateType,
+    graduationDate: applicant.graduationDate,
+    phone: applicant.phone,
+    extraPhone: applicant.extraPhone,
+  }
+}
+
+function formToApplicantPatch(form: ApplicantForm): Partial<Applicant> {
+  return {
+    nationalId: form.nationalId,
+    name: form.name,
+    nationality: form.nationality,
+    age: Number(form.age || 0),
+    certificateType: form.certificateType,
+    graduationDate: form.graduationDate,
+    phone: form.phone,
+    extraPhone: form.extraPhone,
+    qualification: form.certificateType,
+  }
 }
 
 function normalizeScores(scores: InterviewScores = {}) {
@@ -694,22 +736,13 @@ function App() {
   const [selectedId, setSelectedId] = useState(seedApplicants[0].id)
   const [selectedManagerIndex, setSelectedManagerIndex] = useState(0)
   const [nationalId, setNationalId] = useState('')
-  const [form, setForm] = useState({
-    nationalId: '',
-    name: '',
-    nationality: 'سعودي',
-    age: '',
-    certificateType: '',
-    graduationDate: '',
-    phone: '',
-    extraPhone: '',
-  })
+  const [form, setForm] = useState<ApplicantForm>(emptyApplicantForm)
 
   const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
   const stats = useMemo(() => {
     const approved = applicants.filter((item) => item.status === 'النتيجة معتمدة').length
     const pendingDocs = applicants.filter((item) => item.status.includes('مراجعة') || item.status.includes('استكمال')).length
-    const interviewed = applicants.filter((item) => item.status === 'بانتظار اعتماد رئيس القسم' || item.status === 'النتيجة معتمدة').length
+    const interviewed = applicants.filter((item) => item.status === 'تم التقييم' || item.status === 'النتيجة معتمدة').length
     const scheduled = applicants.filter((item) => item.interviewAt).length
     return { total: applicants.length, approved, pendingDocs, interviewed, scheduled }
   }, [applicants])
@@ -775,7 +808,12 @@ function App() {
   }
 
   const submitEvaluation = async (id: string) => {
-    await updateApplicant(id, { status: 'بانتظار اعتماد رئيس القسم', finalResult: calculateScore(selected) >= 35 ? 'مقبول' : 'احتياط' }, 'اعتماد تقييم اللجنة')
+    const score = calculateScore(selected)
+    await updateApplicant(
+      id,
+      { status: 'النتيجة معتمدة', finalResult: score >= 35 ? 'مقبول' : 'احتياط' },
+      `اعتماد تقييم المدرب والنتيجة النهائية بدرجة ${score} من 50`,
+    )
   }
 
   const approveResult = async (id: string) => {
@@ -1427,11 +1465,13 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const [committeeNumber, setCommitteeNumber] = useState('')
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
   const [translatorId, setTranslatorId] = useState(selected.translatorId ?? '')
+  const [editForm, setEditForm] = useState<ApplicantForm>(applicantToForm(selected))
   const selectedStaff = selectedStaffIds
     .map((id) => staffMembers.find((member) => member.id === id))
     .filter((member): member is StaffMember => Boolean(member))
   const selectedScores = normalizeScores(selected.scores)
   const selectedQuestions = getApplicantQuestionSet(selected)
+  const selectedTotalScore = calculateScore(selected)
   const assigned = applicants.filter((applicant) => {
     const applicantCommitteeNumber = applicant.committeeNumber ?? committees.find((committee) => committee.id === applicant.committeeId)?.number
     return committeeNumber ? applicantCommitteeNumber === committeeNumber : false
@@ -1441,6 +1481,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   useEffect(() => {
     setTranslatorId(committeeNumber ? selected.translatorId ?? '' : '')
     setSelectedStaffIds(committeeNumber ? selected.committeeTrainerIds ?? [] : [])
+    setEditForm(applicantToForm(selected))
   }, [committeeNumber, selected.id, selected.committeeTrainerIds, selected.translatorId])
 
   const selectTranslator = (value: string) => {
@@ -1467,6 +1508,22 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const setYesNo = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'hasAssociatedDifficulty' | 'weakHearing' | 'knowsSignLanguage' | 'weakMentalAbilities' | 'distinguished'>, value: YesNo) => {
     updateApplicant(selected.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
   }
+
+  const saveApplicantData = () => {
+    updateApplicant(selected.id, formToApplicantPatch(editForm), 'تعديل بيانات المتقدم من اللجنة')
+  }
+
+  const approveAndMoveNext = async () => {
+    const nextApplicant =
+      assigned.find((applicant) => applicant.id !== selected.id && applicant.status !== 'النتيجة معتمدة') ??
+      applicants.find((applicant) => applicant.id !== selected.id && applicant.status !== 'النتيجة معتمدة') ??
+      applicants.find((applicant) => applicant.id !== selected.id)
+    await submitEvaluation(selected.id)
+    if (nextApplicant) {
+      setSelectedId(nextApplicant.id)
+    }
+  }
+
   return (
     <div className="grid split">
       <section className="panel">
@@ -1533,7 +1590,31 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
       </section>
       <section className="panel">
         <Details applicant={selected} />
+        <section className="inline-editor" aria-label="تعديل بيانات المتقدم من اللجنة">
+          <div className="section-title">
+            <h2>تعديل بيانات المتقدم</h2>
+            <FileText size={21} />
+          </div>
+          <div className="form-grid compact-form">
+            <label>رقم الهوية<input value={editForm.nationalId} onChange={(event) => setEditForm({ ...editForm, nationalId: event.target.value })} /></label>
+            <label>الاسم الكامل<input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} /></label>
+            <label>الجنسية<input value={editForm.nationality} onChange={(event) => setEditForm({ ...editForm, nationality: event.target.value })} /></label>
+            <label>العمر<input inputMode="numeric" value={editForm.age} onChange={(event) => setEditForm({ ...editForm, age: event.target.value })} /></label>
+            <label>نوع الشهادة<input value={editForm.certificateType} onChange={(event) => setEditForm({ ...editForm, certificateType: event.target.value })} /></label>
+            <label>تاريخ التخرج<input type="date" value={editForm.graduationDate} onChange={(event) => setEditForm({ ...editForm, graduationDate: event.target.value })} /></label>
+            <label>رقم الجوال<input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} /></label>
+            <label>رقم جوال إضافي<input value={editForm.extraPhone} onChange={(event) => setEditForm({ ...editForm, extraPhone: event.target.value })} /></label>
+          </div>
+          <div className="actions">
+            <button onClick={saveApplicantData} type="button"><FileCheck2 size={17} /> حفظ تعديل البيانات</button>
+          </div>
+        </section>
         <div className="score-form">
+          <div className="score-summary" aria-label="درجة المتقدم الحالية">
+            <span>درجة المتقدم</span>
+            <strong>{selectedTotalScore} / 50</strong>
+            <small>{selected.finalResult ? `النتيجة: ${selected.finalResult}` : 'تظهر للمدرب قبل الاعتماد وبعده'}</small>
+          </div>
           <Range label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
           <Range label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />
           <div className="question-score-form">
@@ -1560,7 +1641,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
           <textarea value={selected.notes} onChange={(event) => updateApplicant(selected.id, { notes: event.target.value }, 'تحديث ملاحظات المقابلة')} placeholder="ملاحظات المقيم" />
         </div>
         <div className="actions">
-          <button onClick={() => submitEvaluation(selected.id)} type="button"><CheckCircle2 size={17} /> اعتماد تقييم المتقدم</button>
+          <button onClick={approveAndMoveNext} type="button"><CheckCircle2 size={17} /> اعتماد تقييم المتقدم والانتقال للتالي</button>
         </div>
       </section>
     </div>
@@ -1638,22 +1719,34 @@ function ApplicantView({ applicants, nationalId, setNationalId, form, setForm, r
         <label>رقم الهوية الوطنية أو الاسم<input value={nationalId} onChange={(event) => setNationalId(event.target.value)} placeholder="مثال: 1122595406 أو عماش" /></label>
         {found && (
           <div className="found">
-            <Details applicant={found} />
+            <PublicApplicantStatus applicant={found} />
           </div>
         )}
-        <div className="form-grid">
-          <label>رقم الهوية<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} /></label>
-          <label>الاسم الكامل<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label>الجنسية<input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} /></label>
-          <label>العمر<input inputMode="numeric" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></label>
-          <label>نوع الشهادة<input value={form.certificateType} onChange={(event) => setForm({ ...form, certificateType: event.target.value })} /></label>
-          <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
-          <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
-          <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
-          <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> التحقق وإصدار رقم المقابلة</button>
-        </div>
+        {!found && (
+          <div className="form-grid">
+            <label>رقم الهوية<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} /></label>
+            <label>الاسم الكامل<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+            <label>الجنسية<input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} /></label>
+            <label>العمر<input inputMode="numeric" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></label>
+            <label>نوع الشهادة<input value={form.certificateType} onChange={(event) => setForm({ ...form, certificateType: event.target.value })} /></label>
+            <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
+            <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+            <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
+            <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> التحقق وإصدار رقم المقابلة</button>
+          </div>
+        )}
       </section>
     </div>
+  )
+}
+
+function PublicApplicantStatus({ applicant }: { applicant: Applicant }) {
+  return (
+    <section className="public-status" aria-label="بيانات المتقدم بعد التقديم">
+      <span>رقم الانتظار</span>
+      <strong>{applicant.waitingNo ?? 'لم يصدر بعد'}</strong>
+      <h2>{applicant.name}</h2>
+    </section>
   )
 }
 
