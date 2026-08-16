@@ -111,6 +111,26 @@ describe('Interview management system', () => {
     expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
   })
 
+  it('accepts Arabic numerals when issuing a waiting number', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'واجهة المتقدم' }))
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), '١٠٩٩٩٩٩٩٩٨')
+    await user.type(screen.getByLabelText('الاسم الكامل'), 'فيصل سالم العتيبي')
+    await user.clear(screen.getByLabelText('الجنسية'))
+    await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
+    await user.type(screen.getByLabelText('العمر'), '21')
+    await user.type(screen.getByLabelText('نوع الشهادة'), 'ثانوية عامة')
+    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
+    await user.type(screen.getByLabelText('رقم الجوال'), '0557778888')
+    await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
+
+    expect(await screen.findByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
+    expect(screen.getByText('فيصل سالم العتيبي')).toBeTruthy()
+    expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
+  })
+
   it('lets an imported applicant continue registration and then shows the waiting card', async () => {
     const user = userEvent.setup()
     const importedApplicant = seedApplicants.find((applicant) => applicant.id.startsWith('accepted-') && !applicant.waitingNo)

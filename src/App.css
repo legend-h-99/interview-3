@@ -748,6 +748,24 @@ tbody tr.selected {
   align-self: end;
 }
 
+.form-grid button:disabled {
+  cursor: progress;
+  opacity: 0.68;
+  transform: none;
+}
+
+.form-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgb(15 107 143 / 0.18);
+  border-radius: var(--radius-md);
+  color: var(--color-action-primary);
+  background: var(--color-status-info-bg);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .info {
   min-height: 70px;
   padding: 12px;

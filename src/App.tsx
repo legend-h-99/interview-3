@@ -195,6 +195,17 @@ function normalizeImportedPhone(phone: string) {
   return phone.startsWith('5') ? `0${phone}` : phone
 }
 
+function normalizeDigits(value: string) {
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩'
+  const persianDigits = '۰۱۲۳۴۵۶۷۸۹'
+  return value.replace(/[٠-٩۰-۹]/g, (digit) => {
+    const arabicIndex = arabicDigits.indexOf(digit)
+    if (arabicIndex >= 0) return String(arabicIndex)
+    const persianIndex = persianDigits.indexOf(digit)
+    return persianIndex >= 0 ? String(persianIndex) : digit
+  })
+}
+
 function acceptedToApplicant(item: AcceptedApplicant, index: number): Applicant {
   return {
     id: `accepted-${item.nationalId}`,
@@ -737,6 +748,7 @@ function App() {
   const [selectedManagerIndex, setSelectedManagerIndex] = useState(0)
   const [nationalId, setNationalId] = useState('')
   const [issuedApplicantId, setIssuedApplicantId] = useState('')
+  const [applicantSubmitState, setApplicantSubmitState] = useState({ loading: false, message: '' })
   const [form, setForm] = useState<ApplicantForm>(emptyApplicantForm)
 
   const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
@@ -825,9 +837,17 @@ function App() {
   const nextInterviewNumber = () => `INT-${String(applicants.filter((item) => item.waitingNo).length + 1).padStart(3, '0')}`
 
   const registerApplicant = async () => {
-    const applicantNationalId = form.nationalId || (/^\d+$/.test(nationalId) ? nationalId : '')
-    if (!applicantNationalId || !form.name) return
-    const existing = applicants.find((applicant) => applicant.nationalId === applicantNationalId)
+    const applicantNationalId = normalizeDigits(form.nationalId || nationalId).trim()
+    if (!applicantNationalId) {
+      setApplicantSubmitState({ loading: false, message: 'أدخل رقم الهوية أولًا.' })
+      return
+    }
+    if (!form.name.trim()) {
+      setApplicantSubmitState({ loading: false, message: 'أدخل الاسم الكامل قبل المتابعة.' })
+      return
+    }
+    setApplicantSubmitState({ loading: true, message: 'جاري إصدار رقم الانتظار...' })
+    const existing = applicants.find((applicant) => normalizeDigits(applicant.nationalId) === applicantNationalId)
     if (existing) {
       const interviewNo = existing.waitingNo ?? nextInterviewNumber()
       await updateApplicant(
@@ -851,36 +871,42 @@ function App() {
       setSelectedId(existing.id)
       setIssuedApplicantId(existing.id)
       setNationalId(applicantNationalId)
+      setApplicantSubmitState({ loading: false, message: `تم إصدار رقم الانتظار ${interviewNo}` })
       return
     }
-    const response = await fetch(apiUrl('/api/applicants'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        nationalId: applicantNationalId,
-        name: form.name,
-        nationality: form.nationality,
-        age: Number(form.age),
-        certificateType: form.certificateType,
-        graduationDate: form.graduationDate,
-        phone: form.phone,
-        extraPhone: form.extraPhone,
-        qualification: form.certificateType,
-        gpa: 0,
-      }),
-    })
-    if (response.ok) {
+    try {
+      const response = await fetch(apiUrl('/api/applicants'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          nationalId: applicantNationalId,
+          name: form.name,
+          nationality: form.nationality,
+          age: Number(form.age),
+          certificateType: form.certificateType,
+          graduationDate: form.graduationDate,
+          phone: form.phone,
+          extraPhone: form.extraPhone,
+          qualification: form.certificateType,
+          gpa: 0,
+        }),
+      })
+      if (!response.ok) throw new Error('Unable to register applicant')
       const data = (await response.json()) as { applicant: Applicant }
       setApplicants((current) => [data.applicant, ...current.filter((item) => item.id !== data.applicant.id)])
       setSelectedId(data.applicant.id)
       setIssuedApplicantId(data.applicant.id)
       setNationalId(data.applicant.nationalId)
+      setApplicantSubmitState({ loading: false, message: `تم إصدار رقم الانتظار ${data.applicant.waitingNo ?? ''}` })
+    } catch {
+      setApplicantSubmitState({ loading: false, message: 'تعذر إصدار الرقم الآن. تأكد من الاتصال وحاول مرة أخرى.' })
     }
   }
 
   const setApplicantLookup = (value: string) => {
     setNationalId(value)
     setIssuedApplicantId('')
+    setApplicantSubmitState({ loading: false, message: '' })
   }
 
   const resetDemo = async () => {
@@ -998,6 +1024,7 @@ function App() {
             form={form}
             setForm={setForm}
             registerApplicant={registerApplicant}
+            submitState={applicantSubmitState}
           />
         )}
       </section>
@@ -1698,7 +1725,7 @@ function YesNoField({ label, value, onChange }: { label: string; value: YesNo; o
   )
 }
 
-function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalId, form, setForm, registerApplicant }: {
+function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalId, form, setForm, registerApplicant, submitState }: {
   applicants: Applicant[]
   issuedApplicantId: string
   nationalId: string
@@ -1706,9 +1733,11 @@ function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalI
   form: { nationalId: string; name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }
   setForm: (value: { nationalId: string; name: string; nationality: string; age: string; certificateType: string; graduationDate: string; phone: string; extraPhone: string }) => void
   registerApplicant: () => void
+  submitState: { loading: boolean; message: string }
 }) {
   const lookup = nationalId.trim()
-  const found = applicants.find((item) => item.nationalId === lookup || (lookup.length > 1 && item.name.includes(lookup)))
+  const normalizedLookup = normalizeDigits(lookup)
+  const found = applicants.find((item) => normalizeDigits(item.nationalId) === normalizedLookup || (lookup.length > 1 && item.name.includes(lookup)))
   const issuedApplicant = applicants.find((item) => item.id === issuedApplicantId)
   const publicApplicant = issuedApplicant ?? (found?.waitingNo ? found : undefined)
   const showRegistrationForm = !publicApplicant
@@ -1717,7 +1746,7 @@ function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalI
     if (!found) {
       setForm({
         ...form,
-        nationalId: /^\d+$/.test(lookup) ? lookup : form.nationalId,
+        nationalId: /^\d+$/.test(normalizedLookup) ? normalizedLookup : form.nationalId,
       })
       return
     }
@@ -1766,7 +1795,11 @@ function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalI
             <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
             <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
             <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
-            <button onClick={registerApplicant} type="button"><UploadCloud size={17} /> {found ? 'متابعة وإصدار رقم الانتظار' : 'التحقق وإصدار رقم المقابلة'}</button>
+            <button disabled={submitState.loading} onClick={registerApplicant} type="button">
+              <UploadCloud size={17} />
+              {submitState.loading ? 'جاري الإصدار...' : found ? 'متابعة وإصدار رقم الانتظار' : 'التحقق وإصدار رقم المقابلة'}
+            </button>
+            {submitState.message && <p className="form-message" role="status">{submitState.message}</p>}
           </div>
         )}
       </section>
