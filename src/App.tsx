@@ -392,7 +392,7 @@ const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'طريقة التسجيل', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 
 function csvCell(value: string | number | undefined) {
@@ -434,6 +434,10 @@ function formatQuestionsForExport(applicant: Applicant, category: InterviewQuest
     .filter((question) => question.category === category)
     .map((question) => `${question.prompt} الإجابة: ${question.answer}`)
     .join(' | ')
+}
+
+function registrationSourceLabel(source: Source) {
+  return source === 'qobool' ? 'مسجل من البوابة' : 'مسجل بشكل مباشر'
 }
 
 function applicantToForm(applicant: Applicant): ApplicantForm {
@@ -505,7 +509,7 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
       applicant.extraPhone,
       applicant.program ?? '',
       applicant.admissionStatus ?? '',
-      applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر',
+      registrationSourceLabel(applicant.source),
       applicant.status,
       applicant.waitingNo ?? '',
       applicant.interviewAt ?? '',
@@ -643,6 +647,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <td>${escapeHtml(applicant.nationalId)}</td>
         <td>${escapeHtml(applicant.status)}</td>
         <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
+        <td>${escapeHtml(registrationSourceLabel(applicant.source))}</td>
         <td>${escapeHtml(scores.signLanguage)}</td>
         <td>${escapeHtml(scores.appearance)}</td>
         <td>${escapeHtml(scores.generalInfo)}</td>
@@ -717,7 +722,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <section class="pdf-visuals">${charts}</section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>طريقة التسجيل</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -1233,6 +1238,7 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
             <th>الجنسية</th>
             <th>الحالة</th>
             <th>رقم الانتظار</th>
+            <th>طريقة التسجيل</th>
             <th>نوع الشهادة</th>
           </tr>
         </thead>
@@ -1245,6 +1251,7 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
               <td data-label="الجنسية">{applicant.nationality}</td>
               <td data-label="الحالة"><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
               <td data-label="رقم الانتظار">{applicant.waitingNo ?? 'لم يصدر'}</td>
+              <td data-label="طريقة التسجيل">{registrationSourceLabel(applicant.source)}</td>
               <td data-label="نوع الشهادة">{applicant.certificateType}</td>
             </tr>
           ))}
@@ -1261,7 +1268,7 @@ function statusTone(status: Status) {
   return 'info'
 }
 
-function Details({ applicant }: { applicant: Applicant }) {
+function Details({ applicant, hideInterviewPageSections = false }: { applicant: Applicant; hideInterviewPageSections?: boolean }) {
   const committee = committees.find((item) => item.id === applicant.committeeId)
   const committeeNumber = applicant.committeeNumber ?? committee?.number
   const trainers = staffNames(applicant.committeeTrainerIds)
@@ -1273,7 +1280,7 @@ function Details({ applicant }: { applicant: Applicant }) {
         <div>
           <span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span>
           <h2>{applicant.name}</h2>
-          <p><span>{applicant.requestNo}</span> · {applicant.source === 'qobool' ? 'بوابة قبول' : 'تسجيل مباشر'}</p>
+          <p><span>{applicant.requestNo}</span> · {registrationSourceLabel(applicant.source)}</p>
         </div>
         <strong>{applicant.waitingNo ? `رقم المقابلة ${applicant.waitingNo}` : 'بدون رقم مقابلة'}</strong>
       </div>
@@ -1285,6 +1292,7 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="تاريخ التخرج" value={applicant.graduationDate} />
         <Info label="رقم الجوال" value={applicant.phone} />
         <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
+        <Info label="طريقة التسجيل" value={registrationSourceLabel(applicant.source)} />
         {applicant.admissionStatus && <Info label="حالة القبول" value={applicant.admissionStatus} />}
         {applicant.program && <Info label="البرنامج" value={applicant.program} />}
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
@@ -1303,23 +1311,31 @@ function Details({ applicant }: { applicant: Applicant }) {
         <Info label="ضعف عام بالقدرات العقلية والاستيعاب" value={scores.weakMentalAbilities || 'لم يحدد'} />
         <Info label="متقدم متميز" value={scores.distinguished || 'لم يحدد'} />
       </div>
-      <h3>الوثائق</h3>
-      <div className="docs">
-        {applicant.documents.map((document) => (
-          <span key={document.name}><FileCheck2 size={16} /> {document.name}: {document.status}</span>
-        ))}
-      </div>
-      <InterviewQuestions applicant={applicant} />
+      {!hideInterviewPageSections && (
+        <>
+          <h3>الوثائق</h3>
+          <div className="docs">
+            {applicant.documents.map((document) => (
+              <span key={document.name}><FileCheck2 size={16} /> {document.name}: {document.status}</span>
+            ))}
+          </div>
+          <InterviewQuestions applicant={applicant} />
+        </>
+      )}
       {applicant.notes && (
         <>
           <h3>ملاحظات المقابلة</h3>
           <p className="notes">{applicant.notes}</p>
         </>
       )}
-      <h3>سجل التدقيق</h3>
-      <ul className="audit">
-        {applicant.audit.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
-      </ul>
+      {!hideInterviewPageSections && (
+        <>
+          <h3>سجل التدقيق</h3>
+          <ul className="audit">
+            {applicant.audit.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+          </ul>
+        </>
+      )}
     </section>
   )
 }
@@ -1646,7 +1662,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
         <ApplicantTable applicants={applicants} selectedId={activeApplicant.id} onSelect={setSelectedId} />
       </section>
       <section className="panel">
-        <Details applicant={activeApplicant} />
+        <Details applicant={activeApplicant} hideInterviewPageSections />
         <section className="inline-editor" aria-label="تعديل بيانات المتقدم من اللجنة">
           <div className="section-title">
             <h2>تعديل بيانات المتقدم</h2>
@@ -1682,7 +1698,6 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             {selectedQuestions.map((question, index) => (
               <label className="question-score" key={`${question.prompt}-${index}`}>
                 <span>{index + 1}. {question.prompt}</span>
-                <small>الإجابة: {question.answer}</small>
                 <input aria-label={`درجة السؤال ${index + 1}`} max="3" min="0" onChange={(event) => setQuestionScore(index, Number(event.target.value))} type="number" value={selectedScores.questionScores[index]} />
               </label>
             ))}
@@ -1813,6 +1828,7 @@ function PublicApplicantStatus({ applicant }: { applicant: Applicant }) {
       <span>رقم الانتظار</span>
       <strong>{applicant.waitingNo ?? 'لم يصدر بعد'}</strong>
       <h2>{applicant.name}</h2>
+      <p>{registrationSourceLabel(applicant.source)}</p>
     </section>
   )
 }

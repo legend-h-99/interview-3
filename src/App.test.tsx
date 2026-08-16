@@ -107,6 +107,7 @@ describe('Interview management system', () => {
     expect(await screen.findByText('مازن صالح القحطاني')).toBeTruthy()
     expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
     expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
+    expect(screen.getByText('مسجل بشكل مباشر')).toBeTruthy()
     expect(screen.queryByText('0557779999')).toBeNull()
     expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
   })
@@ -153,6 +154,7 @@ describe('Interview management system', () => {
     expect(await screen.findByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
     expect(screen.getByText(importedApplicant?.name ?? '')).toBeTruthy()
     expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
+    expect(screen.getByText('مسجل من البوابة')).toBeTruthy()
     expect(screen.queryByLabelText('الاسم الكامل')).toBeNull()
     expect(screen.queryByText('0557770000')).toBeNull()
   })
@@ -304,6 +306,7 @@ describe('Interview management system', () => {
 
     expect(screen.getAllByText('عبدالله محمد الزهراني').length).toBeGreaterThan(0)
     expect(screen.getByText('W-014')).toBeTruthy()
+    expect(screen.getByText('مسجل من البوابة')).toBeTruthy()
     expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
     expect(screen.queryByText('REQ-2026-0001')).toBeNull()
     expect(screen.queryByLabelText('الاسم الكامل')).toBeNull()
@@ -401,7 +404,7 @@ describe('Interview management system', () => {
     expect(screen.getByText('0550001111')).toBeTruthy()
   })
 
-  it('shows fixed math and English interview questions for the selected applicant', async () => {
+  it('shows plain score inputs and hides document, answer, and audit blocks in the interview page', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -409,11 +412,12 @@ describe('Interview management system', () => {
     await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
 
-    const questions = screen.getByLabelText('أسئلة المقابلة العامة')
-    expect(within(questions).getByText(/معلومات عامة:/)).toBeTruthy()
-    expect(within(questions).getAllByText(/رياضيات/).length).toBeGreaterThan(0)
-    expect(within(questions).getAllByText(/إنجليزي/).length).toBeGreaterThan(0)
-    expect(within(questions).getByText(/ما هو الحرف الكبير/)).toBeTruthy()
-    expect(within(questions).getAllByText(/الإجابة:/)).toHaveLength(5)
+    expect(screen.queryByRole('heading', { name: 'الوثائق' })).toBeNull()
+    expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'سجل التدقيق' })).toBeNull()
+    expect(screen.queryByText(/الإجابة:/)).toBeNull()
+    expect(screen.getByRole('heading', { name: 'معلومات عامة' })).toBeTruthy()
+    expect(screen.getByText(/ما هو الحرف الكبير/)).toBeTruthy()
+    expect(screen.getAllByLabelText(/درجة السؤال/)).toHaveLength(5)
   })
 })
