@@ -248,8 +248,12 @@ function json(data, init = {}) {
   });
 }
 
+function normalizeDigits(value) {
+  return String(value ?? '').replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))).replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+}
+
 function toNumber(value, fallback = 0) {
-  const number = Number(String(value ?? '').replace(/[^0-9.-]/g, ''));
+  const number = Number(normalizeDigits(value).replace(/[^0-9.-]/g, ''));
   return Number.isFinite(number) ? number : fallback;
 }
 
