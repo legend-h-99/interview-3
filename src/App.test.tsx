@@ -224,6 +224,8 @@ describe('Interview management system', () => {
           scores: { ...applicant.scores, signLanguage: 22, appearance: 4, responseSpeed: 4, questionScores: [3, 3, 3, 3, 3] },
           notes: 'ملاحظة تقييم قبولي',
         }
+      : applicant.nationalId === '1125356871'
+        ? { ...applicant, waitingNo: 'W-101', status: 'بانتظار المقابلة' }
       : applicant)
     render(<App />)
 
@@ -235,7 +237,9 @@ describe('Interview management system', () => {
     expect(screen.getByText('1122595406')).toBeTruthy()
     expect(screen.getAllByText('منصة قبولي').length).toBeGreaterThan(0)
     expect(screen.getAllByText('مطابق بالهوية والاسم').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('حاضر').length).toBeGreaterThan(0)
     expect(screen.getAllByText('غير حاضر').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('بانتظار اكتمال الحضور والتقييم').length).toBeGreaterThan(0)
     expect(screen.getAllByText('45 من 50').length).toBeGreaterThan(0)
     expect(screen.getByText('ملاحظة تقييم قبولي')).toBeTruthy()
 
@@ -250,7 +254,9 @@ describe('Interview management system', () => {
     expect(csv).toContain('الملاحظات')
     expect(csv).toContain('عماش عبدالرحمن بن عماش')
     expect(csv).toContain('1122595406')
+    expect(csv).toContain('حاضر')
     expect(csv).toContain('غير حاضر')
+    expect(csv).toContain('بانتظار اكتمال الحضور والتقييم')
     expect(csv).toContain('45')
     expect(csv).toContain('ملاحظة تقييم قبولي')
     expect(csv).toContain('منصة قبولي')

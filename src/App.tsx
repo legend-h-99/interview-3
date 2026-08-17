@@ -522,8 +522,10 @@ function buildQobooliMatches(applicants: Applicant[]) {
     const matchStatus = !systemApplicant ? 'غير موجود في النظام' : nameMatches ? 'مطابق بالهوية والاسم' : 'مطابق بالهوية مع اختلاف الاسم'
     const hasWaitingNo = Boolean(systemApplicant?.waitingNo)
     const isEvaluated = Boolean(systemApplicant && ['تم التقييم', 'بانتظار اعتماد رئيس القسم', 'النتيجة معتمدة'].includes(systemApplicant.status))
-    const attendanceStatus = !hasWaitingNo ? 'غير حاضر' : isEvaluated ? 'تم التقييم' : 'صدر رقم انتظار ولم يتم التقييم'
-    return { accepted, systemApplicant, matchStatus, attendanceStatus, isEvaluated }
+    const isPresent = hasWaitingNo && isEvaluated
+    const isAbsent = !hasWaitingNo && !isEvaluated
+    const attendanceStatus = isPresent ? 'حاضر' : isAbsent ? 'غير حاضر' : 'بانتظار اكتمال الحضور والتقييم'
+    return { accepted, systemApplicant, matchStatus, attendanceStatus, isEvaluated, isPresent }
   })
 }
 
@@ -532,13 +534,13 @@ function getQobooliReportStats(applicants: Applicant[]) {
   const exactMatches = matches.filter((item) => item.matchStatus === 'مطابق بالهوية والاسم').length
   const idOnlyMatches = matches.filter((item) => item.matchStatus === 'مطابق بالهوية مع اختلاف الاسم').length
   const missing = matches.filter((item) => item.matchStatus === 'غير موجود في النظام').length
-  const attended = matches.filter((item) => item.isEvaluated).length
+  const attended = matches.filter((item) => item.isPresent).length
   const noShows = matches.filter((item) => item.attendanceStatus === 'غير حاضر').length
   return { total: acceptedApplicants.length, exactMatches, idOnlyMatches, missing, attended, noShows }
 }
 
 function buildQobooliReportRows(applicants: Applicant[], selectedManager: CollegeManager) {
-  return buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isEvaluated }) => [
+  return buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isPresent }) => [
     collegeProfile.collegeName,
     collegeProfile.departmentName,
     collegeProfile.departmentHeadAndCommitteeChair,
@@ -558,8 +560,8 @@ function buildQobooliReportRows(applicants: Applicant[], selectedManager: Colleg
     systemApplicant?.status ?? 'غير موجود',
     systemApplicant?.waitingNo ?? '',
     fullInterviewScore,
-    systemApplicant && isEvaluated ? calculateScore(systemApplicant) : '',
-    systemApplicant && isEvaluated ? systemApplicant.notes : '',
+    systemApplicant && isPresent ? calculateScore(systemApplicant) : '',
+    systemApplicant && isPresent ? systemApplicant.notes : '',
     qobooliSourceLabel(),
   ])
 }
@@ -784,7 +786,7 @@ function exportQobooliPptx(applicants: Applicant[], selectedManager: CollegeMana
     `مطابق بالهوية والاسم: ${stats.exactMatches}`,
     `مطابق بالهوية مع اختلاف الاسم: ${stats.idOnlyMatches}`,
     `غير موجود في النظام: ${stats.missing}`,
-    `تم تقييمهم: ${stats.attended}`,
+    `حاضر: ${stats.attended}`,
     `لم يحضروا المقابلة: ${stats.noShows}`,
   ]
   downloadBlob(
@@ -2006,7 +2008,7 @@ function QobooliReportView({ applicants, selectedManager }: {
           <Metric icon={CheckCircle2} label="مطابق بالاسم والهوية" value={stats.exactMatches} tone="green" />
           <Metric icon={Search} label="اختلاف اسم" value={stats.idOnlyMatches} tone="amber" />
           <Metric icon={Clock3} label="غير موجود" value={stats.missing} tone="danger" />
-          <Metric icon={UserCheck} label="تم تقييمهم" value={stats.attended} tone="teal" />
+          <Metric icon={UserCheck} label="حاضر" value={stats.attended} tone="teal" />
           <Metric icon={Clock3} label="لم يحضروا" value={stats.noShows} tone="danger" />
         </div>
         <div className="actions">
@@ -2024,17 +2026,17 @@ function QobooliReportView({ applicants, selectedManager }: {
               <tr><th>رقم الهوية</th><th>الاسم في قبولي</th><th>الاسم في النظام</th><th>حالة المطابقة</th><th>حالة الحضور</th><th>حالة النظام</th><th>رقم الانتظار</th><th>الدرجة</th><th>الملاحظات</th><th>المصدر</th></tr>
             </thead>
             <tbody>
-              {matches.map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isEvaluated }) => (
+              {matches.map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isPresent }) => (
                 <tr key={accepted.nationalId}>
                   <td data-label="رقم الهوية">{accepted.nationalId}</td>
                   <td data-label="الاسم في قبولي">{accepted.name}</td>
                   <td data-label="الاسم في النظام">{systemApplicant?.name ?? 'غير موجود'}</td>
                   <td data-label="حالة المطابقة"><span className={`status ${matchStatus === 'مطابق بالهوية والاسم' ? 'success' : matchStatus === 'غير موجود في النظام' ? 'danger' : 'warning'}`}>{matchStatus}</span></td>
-                  <td data-label="حالة الحضور"><span className={`status ${attendanceStatus === 'تم التقييم' ? 'success' : attendanceStatus === 'غير حاضر' ? 'danger' : 'warning'}`}>{attendanceStatus}</span></td>
+                  <td data-label="حالة الحضور"><span className={`status ${attendanceStatus === 'حاضر' ? 'success' : attendanceStatus === 'غير حاضر' ? 'danger' : 'warning'}`}>{attendanceStatus}</span></td>
                   <td data-label="حالة النظام">{systemApplicant?.status ?? 'غير موجود'}</td>
                   <td data-label="رقم الانتظار">{systemApplicant?.waitingNo ?? 'لم يصدر'}</td>
-                  <td data-label="الدرجة">{systemApplicant && isEvaluated ? `${calculateScore(systemApplicant)} من ${fullInterviewScore}` : ''}</td>
-                  <td data-label="الملاحظات">{systemApplicant && isEvaluated ? systemApplicant.notes : ''}</td>
+                  <td data-label="الدرجة">{systemApplicant && isPresent ? `${calculateScore(systemApplicant)} من ${fullInterviewScore}` : ''}</td>
+                  <td data-label="الملاحظات">{systemApplicant && isPresent ? systemApplicant.notes : ''}</td>
                   <td data-label="المصدر">{qobooliSourceLabel()}</td>
                 </tr>
               ))}
@@ -2093,7 +2095,7 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
   const stats = getQobooliReportStats(applicants)
-  const rows = buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isEvaluated }, index) => `
+  const rows = buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isPresent }, index) => `
     <tr>
       <td>${index + 1}</td>
       <td>${escapeHtml(accepted.nationalId)}</td>
@@ -2110,8 +2112,8 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
       <td>${escapeHtml(systemApplicant?.status ?? 'غير موجود')}</td>
       <td>${escapeHtml(systemApplicant?.waitingNo ?? 'لم يصدر')}</td>
       <td>${fullInterviewScore}</td>
-      <td>${systemApplicant && isEvaluated ? escapeHtml(calculateScore(systemApplicant)) : ''}</td>
-      <td>${systemApplicant && isEvaluated ? escapeHtml(systemApplicant.notes) : ''}</td>
+      <td>${systemApplicant && isPresent ? escapeHtml(calculateScore(systemApplicant)) : ''}</td>
+      <td>${systemApplicant && isPresent ? escapeHtml(systemApplicant.notes) : ''}</td>
       <td>${escapeHtml(qobooliSourceLabel())}</td>
     </tr>
   `).join('')
@@ -2155,7 +2157,7 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
           <div class="metric"><span>مطابق بالهوية والاسم</span><strong>${stats.exactMatches}</strong></div>
           <div class="metric"><span>مطابق بالهوية مع اختلاف الاسم</span><strong>${stats.idOnlyMatches}</strong></div>
           <div class="metric"><span>غير موجود في النظام</span><strong>${stats.missing}</strong></div>
-          <div class="metric"><span>تم تقييمهم</span><strong>${stats.attended}</strong></div>
+          <div class="metric"><span>حاضر</span><strong>${stats.attended}</strong></div>
           <div class="metric"><span>لم يحضروا المقابلة</span><strong>${stats.noShows}</strong></div>
         </section>
         <table>
