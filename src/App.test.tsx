@@ -400,7 +400,7 @@ describe('Interview management system', () => {
     }
     await user.click(screen.getAllByRole('radio', { name: 'لا' })[0])
     await user.click(screen.getAllByRole('radio', { name: 'نعم' })[2])
-    await user.type(screen.getByPlaceholderText('ملاحظات المقيم'), 'مرشح مناسب للقسم.')
+    fireEvent.change(screen.getByPlaceholderText('ملاحظات المقيم'), { target: { value: 'مرشح مناسب للقسم.' } })
     expect(within(screen.getByLabelText('درجة المتقدم الحالية')).getByText('45 / 50')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /عرض الدرجة للمراجعة قبل الانتقال/ }))
     expect(screen.getByText('الدرجة جاهزة للمراجعة: 45 من 50')).toBeTruthy()
@@ -414,6 +414,29 @@ describe('Interview management system', () => {
     expect(within(detailsPanel as HTMLElement).getByText('النتيجة معتمدة')).toBeTruthy()
     expect(within(detailsPanel as HTMLElement).getByText('مرشح مناسب للقسم.')).toBeTruthy()
     expect(within(detailsPanel as HTMLElement).getByText('45 من 50')).toBeTruthy()
+  })
+
+  it('blocks interview approval until question scores are complete', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
+    await user.selectOptions(screen.getByLabelText('اختيار المتقدم للمقابلة'), 'a1')
+    fireEvent.change(screen.getByLabelText('الإشارة'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('المظهر العام'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('سرعة الاستجابة للتعليمات'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('درجة السؤال 1'), { target: { value: '3' } })
+
+    await user.click(screen.getByRole('button', { name: /عرض الدرجة للمراجعة قبل الانتقال/ }))
+
+    expect(await screen.findByText(/سجل درجة السؤال/)).toBeTruthy()
+    expect(screen.getByLabelText('المتقدم المختار للمقابلة').textContent).toContain('عبدالله محمد الزهراني')
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
+    await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
+    const detailsPanel = screen.getByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' }).closest('.panel')
+    expect(detailsPanel).toBeTruthy()
+    expect(within(detailsPanel as HTMLElement).queryByText('النتيجة معتمدة')).toBeNull()
   })
 
   it('lets the committee edit applicant data before approving', async () => {

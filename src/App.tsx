@@ -865,12 +865,12 @@ function App() {
     )
   }
 
-  const submitEvaluation = async (id: string) => {
+  const submitEvaluation = async (id: string, finalPatch: Partial<Applicant> = {}) => {
     const evaluatedApplicant = applicants.find((applicant) => applicant.id === id) ?? selected
-    const score = calculateScore(evaluatedApplicant)
+    const score = calculateScore({ ...evaluatedApplicant, ...finalPatch })
     await updateApplicant(
       id,
-      { status: 'النتيجة معتمدة', finalResult: score >= 35 ? 'مقبول' : 'احتياط' },
+      { ...finalPatch, status: 'النتيجة معتمدة', finalResult: score >= 35 ? 'مقبول' : 'احتياط' },
       `اعتماد تقييم المدرب والنتيجة النهائية بدرجة ${score} من 50`,
     )
   }
@@ -1566,7 +1566,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   selected: Applicant
   setSelectedId: (id: string) => void
   updateApplicant: (id: string, patch: Partial<Applicant>, audit?: string) => void
-  submitEvaluation: (id: string) => void
+  submitEvaluation: (id: string, finalPatch?: Partial<Applicant>) => void
 }) {
   const [committeeNumber, setCommitteeNumber] = useState('')
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
@@ -1574,6 +1574,8 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const [editForm, setEditForm] = useState<ApplicantForm>(applicantToForm(selected))
   const [isChoosingApplicant, setIsChoosingApplicant] = useState(true)
   const [questionScoreDrafts, setQuestionScoreDrafts] = useState<string[]>([])
+  const [touchedQuestionScores, setTouchedQuestionScores] = useState<boolean[]>([])
+  const [notesDraft, setNotesDraft] = useState(selected.notes)
   const [reviewReady, setReviewReady] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
   const selectedStaff = selectedStaffIds
@@ -1589,22 +1591,24 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const selectedQuestions = getApplicantQuestionSet(activeApplicant)
   const questionDraftTotal = questionScoreDrafts.reduce((total, score) => total + (score === '' ? 0 : Number(score)), 0)
   const selectedTotalScore = selectedScores.signLanguage + selectedScores.appearance + selectedScores.responseSpeed + questionDraftTotal
-  const questionProgress = questionScoreDrafts.filter((score) => score !== '').length
-  const firstUnscoredQuestionIndex = questionScoreDrafts.findIndex((score) => score === '')
-  const questionScoresComplete = questionScoreDrafts.length === selectedQuestions.length && firstUnscoredQuestionIndex === -1
+  const questionProgress = touchedQuestionScores.filter(Boolean).length
+  const firstUnscoredQuestionIndex = touchedQuestionScores.findIndex((touched) => !touched)
+  const questionScoresComplete = touchedQuestionScores.length === selectedQuestions.length && firstUnscoredQuestionIndex === -1
   const analyticsApplicants = committeeNumber ? assigned : applicants
 
   useEffect(() => {
     setTranslatorId(committeeNumber ? activeApplicant.translatorId ?? '' : '')
     setSelectedStaffIds(committeeNumber ? activeApplicant.committeeTrainerIds ?? [] : [])
     setEditForm(applicantToForm(activeApplicant))
+    setNotesDraft(activeApplicant.notes)
     setReviewReady(false)
     setValidationMessage('')
     const storedQuestionScores = activeApplicant.scores.questionScores
     setQuestionScoreDrafts(selectedQuestions.map((_question, index) => (
       storedQuestionScores && storedQuestionScores[index] !== undefined ? String(storedQuestionScores[index]) : ''
     )))
-  }, [activeApplicant.id, activeApplicant.committeeTrainerIds, activeApplicant.translatorId, committeeNumber])
+    setTouchedQuestionScores(selectedQuestions.map((_question, index) => Boolean(storedQuestionScores && storedQuestionScores[index] !== undefined)))
+  }, [activeApplicant.id, committeeNumber])
 
   const selectTranslator = (value: string) => {
     setTranslatorId(value)
@@ -1623,12 +1627,22 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
   }
 
+  const setNotes = (value: string) => {
+    setNotesDraft(value)
+    setReviewReady(false)
+    setValidationMessage('')
+    updateApplicant(activeApplicant.id, { notes: value }, 'تحديث ملاحظات المقابلة')
+  }
+
   const setQuestionScore = (index: number, rawValue: string) => {
     setReviewReady(false)
     setValidationMessage('')
     const nextDrafts = [...questionScoreDrafts]
     nextDrafts[index] = rawValue
     setQuestionScoreDrafts(nextDrafts)
+    const nextTouched = [...touchedQuestionScores]
+    nextTouched[index] = rawValue !== ''
+    setTouchedQuestionScores(nextTouched)
     if (rawValue === '') return
     const value = Number(rawValue)
     const nextScores = [...selectedScores.questionScores]
@@ -1659,7 +1673,12 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
       return
     }
     setValidationMessage('')
-    await submitEvaluation(activeApplicant.id)
+    const finalScores = {
+      ...selectedScores,
+      questionScores: questionScoreDrafts.map((score) => Number(score)),
+      generalInfo: questionDraftTotal,
+    }
+    await submitEvaluation(activeApplicant.id, { scores: finalScores, notes: notesDraft })
     const nextApplicant =
       applicants.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
       applicants.find((applicant) => applicant.id !== activeApplicant.id)
@@ -1784,8 +1803,8 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             {reviewReady && <b className="review-confirm">الدرجة جاهزة للمراجعة: {selectedTotalScore} من 50</b>}
             {validationMessage && <em className="validation-message">{validationMessage}</em>}
           </div>
-          <Range label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
-          <Range label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />
+          <ScoreInput label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
+          <ScoreInput label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />
           <div className="question-score-form">
             <div className="question-card-title">
               <h3>معلومات عامة</h3>
@@ -1815,7 +1834,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             <YesNoField label="هل لديه ضعف عام بالقدرات العقلية والاستيعاب" value={selectedScores.weakMentalAbilities} onChange={(value) => setYesNo('weakMentalAbilities', value)} />
             <YesNoField label="هل المتقدم متميز" value={selectedScores.distinguished} onChange={(value) => setYesNo('distinguished', value)} />
           </div>
-          <textarea value={activeApplicant.notes} onChange={(event) => updateApplicant(activeApplicant.id, { notes: event.target.value }, 'تحديث ملاحظات المقابلة')} placeholder="ملاحظات المقيم" />
+          <textarea value={notesDraft} onChange={(event) => setNotes(event.target.value)} placeholder="ملاحظات المقيم" />
         </div>
         <div className="actions">
           <button onClick={approveAndMoveNext} type="button"><CheckCircle2 size={17} /> {reviewReady ? 'تأكيد الاعتماد والانتقال للمتقدم التالي' : 'عرض الدرجة للمراجعة قبل الانتقال'}</button>
@@ -1831,6 +1850,15 @@ function Range({ label, value, max = 100, onChange }: { label: string; value: nu
       <span>{label} <small>من {max}</small></span>
       <input aria-label={label} min="0" max={max} onChange={(event) => onChange(Number(event.target.value))} type="range" value={value} />
       <strong>{value}</strong>
+    </label>
+  )
+}
+
+function ScoreInput({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <label className="score-input">
+      <span>{label} <small>من {max}</small></span>
+      <input aria-label={label} inputMode="numeric" min="0" max={max} onChange={(event) => onChange(Math.min(max, Math.max(0, Number(event.target.value))))} type="number" value={value} />
     </label>
   )
 }

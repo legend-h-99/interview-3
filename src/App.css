@@ -1089,6 +1089,35 @@ tbody tr.selected {
   text-align: center;
 }
 
+.score-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e2e8ef;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.score-input span {
+  min-width: 0;
+  font-weight: 800;
+}
+
+.score-input small {
+  display: inline-block;
+  margin-inline-start: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.score-input input {
+  width: 84px;
+  text-align: center;
+}
+
 .question-score-form,
 .yes-no-grid {
   display: grid;
