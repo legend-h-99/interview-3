@@ -257,6 +257,25 @@ describe('Interview management system', () => {
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-xlsx')
   })
 
+  it('exports applicants to a PPTX presentation file', async () => {
+    const user = userEvent.setup()
+    const createObjectUrl = vi.fn(() => 'blob:interview-3-pptx')
+    const revokeObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
+    await user.click(screen.getByRole('button', { name: 'PPTX' }))
+
+    expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
+    const blob = createObjectUrl.mock.calls.at(0)?.at(0) as unknown as Blob
+    expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.presentationml.presentation')
+    expect(clickSpy).toHaveBeenCalled()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-pptx')
+  })
+
   it('opens a printable PDF report with college identity and selected manager', async () => {
     const user = userEvent.setup()
     const write = vi.fn()
