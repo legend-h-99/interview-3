@@ -19,6 +19,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
+import { strToU8, zipSync } from 'fflate'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
@@ -415,9 +416,26 @@ function apiFetch(path: string, init: RequestInit = {}) {
   return fetch(apiUrl(path), { ...init, headers })
 }
 
-function csvCell(value: string | number | undefined) {
+type ReportCell = string | number | undefined
+
+function csvCell(value: ReportCell) {
   const text = String(value ?? '')
   return `"${text.replaceAll('"', '""')}"`
+}
+
+function reportFileName(fileLabel: string, extension: string) {
+  return `interview-3-${fileLabel}-${new Date().toISOString().slice(0, 10)}.${extension}`
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const link = document.createElement('a')
+  const href = URL.createObjectURL(blob)
+  link.href = href
+  link.download = fileName
+  document.body.append(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(href)
 }
 
 function formatManager(manager: CollegeManager) {
@@ -513,7 +531,7 @@ function normalizeScores(scores: InterviewScores = {}) {
   }
 }
 
-function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
+function buildApplicantReportRows(applicants: Applicant[], selectedManager: CollegeManager) {
   const rows = applicants.map((applicant) => {
     const scores = normalizeScores(applicant.scores)
     return [
@@ -554,25 +572,99 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
     ]
   })
   const staffRows = staffMembers.map((member) => [member.name, member.computerNo ?? '', member.task])
-  const csv = [
+  return { rows, staffRows }
+}
+
+function buildApplicantCsv(applicants: Applicant[], selectedManager: CollegeManager) {
+  const { rows, staffRows } = buildApplicantReportRows(applicants, selectedManager)
+  return [
     'بيانات المتقدمين',
     [exportHeaders, ...rows].map((row) => row.map(csvCell).join(',')).join('\n'),
     '',
     'بيانات فرق العمل',
     [staffExportHeaders, ...staffRows].map((row) => row.map(csvCell).join(',')).join('\n'),
   ].join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob)
-  link.download = `interview-3-${fileLabel}-${new Date().toISOString().slice(0, 10)}.csv`
-  document.body.append(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(link.href)
 }
 
-function exportPortalNoShowExcel(applicants: Applicant[], selectedManager: CollegeManager) {
-  exportApplicantsExcel(getPortalNoShowApplicants(applicants), selectedManager, 'portal-no-shows')
+function exportApplicantsCsv(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
+  const csv = buildApplicantCsv(applicants, selectedManager)
+  downloadBlob(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }), reportFileName(fileLabel, 'csv'))
+}
+
+function exportApplicantsXlsx(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
+  const { rows, staffRows } = buildApplicantReportRows(applicants, selectedManager)
+  downloadBlob(
+    buildXlsxBlob([
+      { name: 'بيانات المتقدمين', rows: [exportHeaders, ...rows] },
+      { name: 'فرق العمل', rows: [staffExportHeaders, ...staffRows] },
+    ]),
+    reportFileName(fileLabel, 'xlsx'),
+  )
+}
+
+function buildXlsxBlob(sheets: { name: string; rows: ReportCell[][] }[]) {
+  const workbookSheets = sheets.map((sheet, index) => `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join('')
+  const workbookRels = sheets.map((_sheet, index) => `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`).join('')
+  const overrides = sheets.map((_sheet, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')
+  const worksheetFiles = Object.fromEntries(sheets.map((sheet, sheetIndex) => {
+    const rowsXml = sheet.rows.map((row, rowIndex) => {
+      const cells = row.map((cell, cellIndex) => {
+        const ref = `${columnName(cellIndex)}${rowIndex + 1}`
+        if (typeof cell === 'number' && Number.isFinite(cell)) return `<c r="${ref}"><v>${cell}</v></c>`
+        return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(cell)}</t></is></c>`
+      }).join('')
+      return `<row r="${rowIndex + 1}">${cells}</row>`
+    }).join('')
+    return [`xl/worksheets/sheet${sheetIndex + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews><sheetData>${rowsXml}</sheetData></worksheet>`]
+  }))
+  return zippedOfficeBlob({
+    '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${overrides}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`,
+    '_rels/.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
+    'docProps/core.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>interview 3 report</dc:title><dc:creator>interview 3</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created></cp:coreProperties>`,
+    'docProps/app.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>interview 3</Application></Properties>`,
+    'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookViews><workbookView/></workbookViews><sheets>${workbookSheets}</sheets></workbook>`,
+    'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${workbookRels}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    'xl/styles.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs></styleSheet>`,
+    ...worksheetFiles,
+  }, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+}
+
+function exportApplicantsPptx(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
+  const analytics = computeVisualAnalytics(applicants)
+  const title = fileLabel === 'portal-no-shows' ? 'تقرير عدم حضور مقابلات البوابة' : 'تقرير منصة interview 3'
+  const totalPortal = applicants.filter((item) => item.source === 'qobool').length
+  const noShows = getPortalNoShowApplicants(applicants).length
+  const metricLines = [
+    `إجمالي المتقدمين: ${applicants.length}`,
+    `المسجلون من البوابة: ${totalPortal}`,
+    `لم يحضروا المقابلة: ${noShows}`,
+    `نتائج معتمدة: ${applicants.filter((item) => item.status === 'النتيجة معتمدة').length}`,
+  ]
+  const statusLines = analytics.status.slice(0, 7).map((item) => `${item.label}: ${item.value}`)
+  const sampleLines = applicants.slice(0, 10).map((applicant, index) => `${index + 1}. ${applicant.name} - ${applicant.waitingNo ?? 'لم يصدر'} - ${applicant.status}`)
+  downloadBlob(
+    buildPptxBlob([
+      { text: title, x: 500000, y: 300000, w: 11300000, h: 500000, size: 2600, bold: true, color: '182235' },
+      { text: `${collegeProfile.collegeName} - ${collegeProfile.departmentName}`, x: 500000, y: 850000, w: 11300000, h: 320000, size: 1300, color: '475569' },
+      { text: metricLines.join('\n'), x: 6900000, y: 1500000, w: 5200000, h: 1500000, size: 1500, bold: true, color: '0F6B8F', fill: 'FFFFFF' },
+      { text: `توزيع الحالات\n${statusLines.join('\n')}`, x: 6900000, y: 3300000, w: 5200000, h: 2400000, size: 1300, color: '334155', fill: 'FFFFFF' },
+      { text: `أول الأسماء في التقرير\n${sampleLines.join('\n') || 'لا توجد بيانات مطابقة'}`, x: 700000, y: 1500000, w: 5600000, h: 4200000, size: 1250, color: '182235', fill: 'FFFFFF' },
+      { text: `مسؤول إدارة الكلية: ${formatManager(selectedManager)} | وكيل شؤون المتدربين: ${collegeProfile.traineeAffairsDeputy}`, x: 700000, y: 6600000, w: 11300000, h: 320000, size: 1000, color: '64748B' },
+    ]),
+    reportFileName(fileLabel, 'pptx'),
+  )
+}
+
+function exportPortalNoShowCsv(applicants: Applicant[], selectedManager: CollegeManager) {
+  exportApplicantsCsv(getPortalNoShowApplicants(applicants), selectedManager, 'portal-no-shows')
+}
+
+function exportPortalNoShowXlsx(applicants: Applicant[], selectedManager: CollegeManager) {
+  exportApplicantsXlsx(getPortalNoShowApplicants(applicants), selectedManager, 'portal-no-shows')
+}
+
+function exportPortalNoShowPptx(applicants: Applicant[], selectedManager: CollegeManager) {
+  return exportApplicantsPptx(getPortalNoShowApplicants(applicants), selectedManager, 'portal-no-shows')
 }
 
 function escapeHtml(value: string | number | undefined) {
@@ -582,6 +674,97 @@ function escapeHtml(value: string | number | undefined) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
+}
+
+function escapeXml(value: ReportCell) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
+}
+
+function columnName(index: number) {
+  let column = ''
+  let next = index + 1
+  while (next > 0) {
+    const remainder = (next - 1) % 26
+    column = String.fromCharCode(65 + remainder) + column
+    next = Math.floor((next - 1) / 26)
+  }
+  return column
+}
+
+function zippedOfficeBlob(files: Record<string, string>, type: string) {
+  const zipped = zipSync(Object.fromEntries(
+    Object.entries(files).map(([path, content]) => [path, strToU8(content)]),
+  ))
+  return new Blob([zipped], { type })
+}
+
+function pptTextShape({ text, x, y, w, h, size, bold = false, color, fill }: {
+  text: string
+  x: number
+  y: number
+  w: number
+  h: number
+  size: number
+  bold?: boolean
+  color: string
+  fill?: string
+}, index: number) {
+  const fillXml = fill ? `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>` : '<a:noFill/>'
+  const paragraphs = text.split('\n').map((line) => `
+    <a:p>
+      <a:pPr algn="r" rtl="1"/>
+      <a:r>
+        <a:rPr lang="ar-SA" sz="${size}"${bold ? ' b="1"' : ''}>
+          <a:solidFill><a:srgbClr val="${color}"/></a:solidFill>
+        </a:rPr>
+        <a:t>${escapeXml(line)}</a:t>
+      </a:r>
+    </a:p>
+  `).join('')
+  return `
+    <p:sp>
+      <p:nvSpPr><p:cNvPr id="${index}" name="Text ${index}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+      <p:spPr>
+        <a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm>
+        <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+        ${fillXml}
+        <a:ln><a:solidFill><a:srgbClr val="D9E2EC"/></a:solidFill></a:ln>
+      </p:spPr>
+      <p:txBody><a:bodyPr rtlCol="1" anchor="t"/><a:lstStyle/>${paragraphs}</p:txBody>
+    </p:sp>
+  `
+}
+
+function buildPptxBlob(shapes: Parameters<typeof pptTextShape>[0][]) {
+  const shapeXml = shapes.map((shape, index) => pptTextShape(shape, index + 2)).join('')
+  const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+      <p:cSld>
+        <p:bg><p:bgPr><a:solidFill><a:srgbClr val="F8FBFD"/></a:solidFill></p:bgPr></p:bg>
+        <p:spTree>
+          <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+          <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+          ${shapeXml}
+        </p:spTree>
+      </p:cSld>
+      <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+    </p:sld>`
+  return zippedOfficeBlob({
+    '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`,
+    '_rels/.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
+    'docProps/core.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>interview 3 presentation</dc:title><dc:creator>interview 3</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created></cp:coreProperties>`,
+    'docProps/app.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>interview 3</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>1</Slides></Properties>`,
+    'ppt/presentation.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="12192000" cy="6858000" type="wide"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`,
+    'ppt/_rels/presentation.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/></Relationships>`,
+    'ppt/slides/slide1.xml': slideXml,
+    'ppt/slides/_rels/slide1.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`,
+    'ppt/theme/theme1.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="interview 3"><a:themeElements><a:clrScheme name="interview 3"><a:dk1><a:srgbClr val="182235"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="334155"/></a:dk2><a:lt2><a:srgbClr val="F8FBFD"/></a:lt2><a:accent1><a:srgbClr val="0F6B8F"/></a:accent1><a:accent2><a:srgbClr val="0F766E"/></a:accent2><a:accent3><a:srgbClr val="B7791F"/></a:accent3><a:accent4><a:srgbClr val="64748B"/></a:accent4><a:accent5><a:srgbClr val="8B5CF6"/></a:accent5><a:accent6><a:srgbClr val="DC2626"/></a:accent6><a:hlink><a:srgbClr val="0F6B8F"/></a:hlink><a:folHlink><a:srgbClr val="64748B"/></a:folHlink></a:clrScheme><a:fontScheme name="Arial"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme><a:fmtScheme name="interview 3"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`,
+  }, 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
 }
 
 function pdfBarChart(title: string, data: ChartDatum[]) {
@@ -1118,8 +1301,10 @@ function App() {
                 </select>
               </label>
             )}
-            <button onClick={() => exportApplicantsExcel(applicants, selectedManager)} type="button"><Download size={17} /> تصدير Excel</button>
-            <button onClick={() => openApplicantsPdfReport(applicants, stats, selectedManager)} type="button"><FileText size={17} /> تقرير PDF</button>
+            <button onClick={() => exportApplicantsXlsx(applicants, selectedManager)} type="button"><Download size={17} /> XLSX</button>
+            <button onClick={() => exportApplicantsCsv(applicants, selectedManager)} type="button"><Download size={17} /> CSV</button>
+            <button onClick={() => void exportApplicantsPptx(applicants, selectedManager)} type="button"><BarChart3 size={17} /> PPTX</button>
+            <button onClick={() => openApplicantsPdfReport(applicants, stats, selectedManager)} type="button"><FileText size={17} /> PDF</button>
             <button onClick={() => refreshApplicants()} type="button"><RefreshCcw size={17} /> مزامنة البيانات</button>
           </div>}
         </header>
@@ -1564,8 +1749,10 @@ function PortalNoShowView({ applicants, selectedManager, stats }: {
           <Metric icon={BarChart3} label="نسبة عدم الحضور" value={noShowPercent} tone="amber" />
         </div>
         <div className="actions">
-          <button onClick={() => exportPortalNoShowExcel(applicants, selectedManager)} type="button"><Download size={17} /> تصدير تقرير Excel</button>
-          <button onClick={() => openPortalNoShowPdfReport(applicants, selectedManager)} type="button"><FileText size={17} /> تقرير PDF خاص</button>
+          <button onClick={() => exportPortalNoShowXlsx(applicants, selectedManager)} type="button"><Download size={17} /> XLSX</button>
+          <button onClick={() => exportPortalNoShowCsv(applicants, selectedManager)} type="button"><Download size={17} /> CSV</button>
+          <button onClick={() => void exportPortalNoShowPptx(applicants, selectedManager)} type="button"><BarChart3 size={17} /> PPTX</button>
+          <button onClick={() => openPortalNoShowPdfReport(applicants, selectedManager)} type="button"><FileText size={17} /> PDF</button>
         </div>
       </section>
       <section className="panel">

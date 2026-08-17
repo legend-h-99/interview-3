@@ -207,7 +207,7 @@ describe('Interview management system', () => {
     }
   })
 
-  it('exports applicants and college identity to an Excel-compatible CSV file', async () => {
+  it('exports applicants and college identity to a CSV file', async () => {
     const user = userEvent.setup()
     const createObjectUrl = vi.fn(() => 'blob:interview-3-export')
     const revokeObjectUrl = vi.fn()
@@ -218,7 +218,11 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
     await user.selectOptions(screen.getByLabelText('مسؤول إدارة الكلية'), '2')
-    await user.click(screen.getByRole('button', { name: /تصدير Excel/ }))
+    expect(screen.getByRole('button', { name: 'XLSX' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'CSV' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'PPTX' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'PDF' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'CSV' }))
 
     expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
     const blob = createObjectUrl.mock.calls.at(0)?.at(0) as unknown as Blob
@@ -234,6 +238,25 @@ describe('Interview management system', () => {
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-export')
   })
 
+  it('exports applicants and college identity to a real XLSX file', async () => {
+    const user = userEvent.setup()
+    const createObjectUrl = vi.fn(() => 'blob:interview-3-xlsx')
+    const revokeObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
+    await user.click(screen.getByRole('button', { name: 'XLSX' }))
+
+    expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
+    const blob = createObjectUrl.mock.calls.at(0)?.at(0) as unknown as Blob
+    expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    expect(clickSpy).toHaveBeenCalled()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-xlsx')
+  })
+
   it('opens a printable PDF report with college identity and selected manager', async () => {
     const user = userEvent.setup()
     const write = vi.fn()
@@ -245,7 +268,7 @@ describe('Interview management system', () => {
 
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'إدارة الكلية' }))
     await user.selectOptions(screen.getByLabelText('مسؤول إدارة الكلية'), '1')
-    await user.click(screen.getByRole('button', { name: /تقرير PDF/ }))
+    await user.click(screen.getByRole('button', { name: 'PDF' }))
 
     expect(window.open).toHaveBeenCalled()
     expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير interview 3'))
@@ -361,8 +384,12 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'تقرير المسجلين من البوابة ولم يحضروا' })).toBeTruthy()
     expect(screen.getByText(portalApplicant?.name ?? '')).toBeTruthy()
     expect(screen.getByText('يعرض هذا التقرير فقط المتقدمين المسجلين من البوابة وحالتهم: معتذر أو لم يحضر.')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'XLSX' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'CSV' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'PPTX' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'PDF' }).length).toBeGreaterThan(0)
 
-    await user.click(screen.getByRole('button', { name: /تقرير PDF خاص/ }))
+    await user.click(screen.getAllByRole('button', { name: 'PDF' }).at(-1) as HTMLElement)
 
     expect(window.open).toHaveBeenCalled()
     expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير المسجلين من البوابة ولم يحضروا المقابلة'))
