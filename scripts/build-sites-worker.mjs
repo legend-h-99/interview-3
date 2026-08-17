@@ -164,6 +164,7 @@ const workerSource = `
 const files = new Map(${JSON.stringify(files.map((file) => [file.path, file]))});
 const seedApplicants = ${JSON.stringify(seedApplicants)};
 const defaultInterviewScores = ${JSON.stringify(defaultInterviewScores)};
+const neutralStatus = ${JSON.stringify(neutralStatus)};
 const maxConcurrentUsers = 150;
 const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   id TEXT PRIMARY KEY,
