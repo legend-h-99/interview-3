@@ -386,7 +386,8 @@ const noShowStatus: Status = 'معتذر أو لم يحضر'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const fullInterviewScore = 50
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 let fallbackSessionId = ''
 
@@ -560,6 +561,7 @@ function buildApplicantReportRows(applicants: Applicant[], selectedManager: Coll
       scores.appearance,
       scores.generalInfo,
       scores.responseSpeed,
+      fullInterviewScore,
       calculateScore(applicant),
       scores.hasAssociatedDifficulty,
       scores.weakHearing,
@@ -638,6 +640,8 @@ function exportApplicantsPptx(applicants: Applicant[], selectedManager: CollegeM
     `إجمالي المتقدمين: ${applicants.length}`,
     `المسجلون من البوابة: ${totalPortal}`,
     `لم يحضروا المقابلة: ${noShows}`,
+    `الدرجة الكاملة: ${fullInterviewScore}`,
+    `متوسط المجموع: ${averageScore(applicants, (_scores, applicant) => calculateScore(applicant))}`,
     `نتائج معتمدة: ${applicants.filter((item) => item.status === 'النتيجة معتمدة').length}`,
   ]
   const statusLines = analytics.status.slice(0, 7).map((item) => `${item.label}: ${item.value}`)
@@ -851,6 +855,8 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
       <td>${escapeHtml(applicant.interviewAt ?? 'غير مجدول')}</td>
       <td>${escapeHtml(applicant.program ?? applicant.certificateType)}</td>
       <td>${escapeHtml(applicant.status)}</td>
+      <td>${fullInterviewScore}</td>
+      <td>${escapeHtml(calculateScore(applicant))}</td>
     </tr>
   `).join('')
   report.document.write(`
@@ -897,7 +903,7 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
         ${noShows.length === 0 ? '<div class="empty">لا يوجد مسجلون من البوابة بحالة لم يحضروا المقابلة.</div>' : `
           <table>
             <thead>
-              <tr><th>#</th><th>الاسم</th><th>رقم الهوية</th><th>رقم الجوال</th><th>رقم الانتظار</th><th>موعد المقابلة</th><th>البرنامج</th><th>الحالة</th></tr>
+              <tr><th>#</th><th>الاسم</th><th>رقم الهوية</th><th>رقم الجوال</th><th>رقم الانتظار</th><th>موعد المقابلة</th><th>البرنامج</th><th>الحالة</th><th>الدرجة الكاملة</th><th>المجموع</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
@@ -935,6 +941,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <td>${escapeHtml(scores.appearance)}</td>
         <td>${escapeHtml(scores.generalInfo)}</td>
         <td>${escapeHtml(scores.responseSpeed)}</td>
+        <td>${fullInterviewScore}</td>
         <td>${escapeHtml(calculateScore(applicant))}</td>
         <td>${escapeHtml(scores.hasAssociatedDifficulty || 'لم يحدد')}</td>
         <td>${escapeHtml(scores.weakHearing || 'لم يحدد')}</td>
@@ -1005,7 +1012,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <section class="pdf-visuals">${charts}</section>
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>المجموع /50</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>الدرجة الكاملة</th><th>المجموع</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
