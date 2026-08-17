@@ -1573,6 +1573,9 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const [translatorId, setTranslatorId] = useState(selected.translatorId ?? '')
   const [editForm, setEditForm] = useState<ApplicantForm>(applicantToForm(selected))
   const [isChoosingApplicant, setIsChoosingApplicant] = useState(true)
+  const [questionScoreDrafts, setQuestionScoreDrafts] = useState<string[]>([])
+  const [reviewReady, setReviewReady] = useState(false)
+  const [validationMessage, setValidationMessage] = useState('')
   const selectedStaff = selectedStaffIds
     .map((id) => staffMembers.find((member) => member.id === id))
     .filter((member): member is StaffMember => Boolean(member))
@@ -1584,13 +1587,23 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const activeApplicant = selected
   const selectedScores = normalizeScores(activeApplicant.scores)
   const selectedQuestions = getApplicantQuestionSet(activeApplicant)
-  const selectedTotalScore = calculateScore(activeApplicant)
+  const questionDraftTotal = questionScoreDrafts.reduce((total, score) => total + (score === '' ? 0 : Number(score)), 0)
+  const selectedTotalScore = selectedScores.signLanguage + selectedScores.appearance + selectedScores.responseSpeed + questionDraftTotal
+  const questionProgress = questionScoreDrafts.filter((score) => score !== '').length
+  const firstUnscoredQuestionIndex = questionScoreDrafts.findIndex((score) => score === '')
+  const questionScoresComplete = questionScoreDrafts.length === selectedQuestions.length && firstUnscoredQuestionIndex === -1
   const analyticsApplicants = committeeNumber ? assigned : applicants
 
   useEffect(() => {
     setTranslatorId(committeeNumber ? activeApplicant.translatorId ?? '' : '')
     setSelectedStaffIds(committeeNumber ? activeApplicant.committeeTrainerIds ?? [] : [])
     setEditForm(applicantToForm(activeApplicant))
+    setReviewReady(false)
+    setValidationMessage('')
+    const storedQuestionScores = activeApplicant.scores.questionScores
+    setQuestionScoreDrafts(selectedQuestions.map((_question, index) => (
+      storedQuestionScores && storedQuestionScores[index] !== undefined ? String(storedQuestionScores[index]) : ''
+    )))
   }, [activeApplicant.id, activeApplicant.committeeTrainerIds, activeApplicant.translatorId, committeeNumber])
 
   const selectTranslator = (value: string) => {
@@ -1605,16 +1618,27 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   }
 
   const setScore = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'signLanguage' | 'appearance' | 'responseSpeed'>, value: number) => {
+    setReviewReady(false)
+    setValidationMessage('')
     updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
   }
 
-  const setQuestionScore = (index: number, value: number) => {
+  const setQuestionScore = (index: number, rawValue: string) => {
+    setReviewReady(false)
+    setValidationMessage('')
+    const nextDrafts = [...questionScoreDrafts]
+    nextDrafts[index] = rawValue
+    setQuestionScoreDrafts(nextDrafts)
+    if (rawValue === '') return
+    const value = Number(rawValue)
     const nextScores = [...selectedScores.questionScores]
     nextScores[index] = Math.min(3, Math.max(0, value))
     updateApplicant(activeApplicant.id, { scores: { ...selectedScores, questionScores: nextScores, generalInfo: nextScores.reduce((total, score) => total + score, 0) }, status: 'المقابلة جارية' }, 'حفظ درجة سؤال المعلومات العامة')
   }
 
   const setYesNo = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'hasAssociatedDifficulty' | 'weakHearing' | 'knowsSignLanguage' | 'weakMentalAbilities' | 'distinguished'>, value: YesNo) => {
+    setReviewReady(false)
+    setValidationMessage('')
     updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
   }
 
@@ -1623,13 +1647,25 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   }
 
   const approveAndMoveNext = async () => {
+    if (!questionScoresComplete) {
+      const nextQuestion = firstUnscoredQuestionIndex + 1
+      setValidationMessage(`سجل درجة السؤال ${nextQuestion} قبل المتابعة.`)
+      setReviewReady(false)
+      return
+    }
+    if (!reviewReady) {
+      setReviewReady(true)
+      setValidationMessage('راجع الدرجة الظاهرة ثم اضغط تأكيد الاعتماد والانتقال.')
+      return
+    }
+    setValidationMessage('')
+    await submitEvaluation(activeApplicant.id)
     const nextApplicant =
       applicants.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
       applicants.find((applicant) => applicant.id !== activeApplicant.id)
     if (nextApplicant) {
       setSelectedId(nextApplicant.id)
     }
-    await submitEvaluation(activeApplicant.id)
   }
 
   return (
@@ -1744,7 +1780,9 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
           <div className="score-summary" aria-label="درجة المتقدم الحالية">
             <span>درجة المتقدم قبل الاعتماد</span>
             <strong>{selectedTotalScore} / 50</strong>
-            <small>{activeApplicant.finalResult ? `تم اعتماد المدرب: ${activeApplicant.finalResult}` : 'راجع الدرجة ثم اضغط اعتماد التقييم للانتقال للمتقدم التالي'}</small>
+            <small>{activeApplicant.finalResult ? `تم اعتماد المدرب: ${activeApplicant.finalResult}` : `تم تسجيل ${questionProgress} من ${selectedQuestions.length} درجات أسئلة`}</small>
+            {reviewReady && <b className="review-confirm">الدرجة جاهزة للمراجعة: {selectedTotalScore} من 50</b>}
+            {validationMessage && <em className="validation-message">{validationMessage}</em>}
           </div>
           <Range label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
           <Range label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />
@@ -1756,7 +1794,16 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             {selectedQuestions.map((question, index) => (
               <label className="question-score" key={`${question.prompt}-${index}`}>
                 <span>{index + 1}. {question.prompt}</span>
-                <input aria-label={`درجة السؤال ${index + 1}`} max="3" min="0" onChange={(event) => setQuestionScore(index, Number(event.target.value))} type="number" value={selectedScores.questionScores[index]} />
+                <input
+                  aria-label={`درجة السؤال ${index + 1}`}
+                  disabled={firstUnscoredQuestionIndex !== -1 && index > firstUnscoredQuestionIndex}
+                  max="3"
+                  min="0"
+                  onChange={(event) => setQuestionScore(index, event.target.value)}
+                  placeholder="--"
+                  type="number"
+                  value={questionScoreDrafts[index] ?? ''}
+                />
               </label>
             ))}
           </div>
@@ -1771,7 +1818,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
           <textarea value={activeApplicant.notes} onChange={(event) => updateApplicant(activeApplicant.id, { notes: event.target.value }, 'تحديث ملاحظات المقابلة')} placeholder="ملاحظات المقيم" />
         </div>
         <div className="actions">
-          <button onClick={approveAndMoveNext} type="button"><CheckCircle2 size={17} /> اعتماد تقييم المتقدم والانتقال للتالي</button>
+          <button onClick={approveAndMoveNext} type="button"><CheckCircle2 size={17} /> {reviewReady ? 'تأكيد الاعتماد والانتقال للمتقدم التالي' : 'عرض الدرجة للمراجعة قبل الانتقال'}</button>
         </div>
       </section>
     </div>

@@ -985,6 +985,28 @@ tbody tr.selected {
   line-height: 1.1;
 }
 
+.review-confirm,
+.validation-message {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.review-confirm {
+  color: #075985;
+  background: #e0f2fe;
+}
+
+.validation-message {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .progress {
   display: grid;
   gap: 8px;
@@ -1100,6 +1122,11 @@ tbody tr.selected {
 .question-score input {
   width: 64px;
   text-align: center;
+}
+
+.question-score input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .yes-no-grid {

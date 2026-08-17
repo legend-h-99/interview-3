@@ -390,14 +390,21 @@ describe('Interview management system', () => {
     fireEvent.change(screen.getByLabelText('الإشارة'), { target: { value: '22' } })
     fireEvent.change(screen.getByLabelText('المظهر العام'), { target: { value: '4' } })
     fireEvent.change(screen.getByLabelText('سرعة الاستجابة للتعليمات'), { target: { value: '4' } })
-    for (const input of screen.getAllByLabelText(/درجة السؤال/)) {
+    let questionInputs = screen.getAllByLabelText(/درجة السؤال/) as HTMLInputElement[]
+    expect(questionInputs[1].disabled).toBe(true)
+    fireEvent.change(questionInputs[0], { target: { value: '3' } })
+    questionInputs = screen.getAllByLabelText(/درجة السؤال/) as HTMLInputElement[]
+    expect(questionInputs[1].disabled).toBe(false)
+    for (const input of questionInputs.slice(1)) {
       fireEvent.change(input, { target: { value: '3' } })
     }
     await user.click(screen.getAllByRole('radio', { name: 'لا' })[0])
     await user.click(screen.getAllByRole('radio', { name: 'نعم' })[2])
     await user.type(screen.getByPlaceholderText('ملاحظات المقيم'), 'مرشح مناسب للقسم.')
     expect(within(screen.getByLabelText('درجة المتقدم الحالية')).getByText('45 / 50')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: /اعتماد تقييم المتقدم والانتقال للتالي/ }))
+    await user.click(screen.getByRole('button', { name: /عرض الدرجة للمراجعة قبل الانتقال/ }))
+    expect(screen.getByText('الدرجة جاهزة للمراجعة: 45 من 50')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /تأكيد الاعتماد والانتقال للمتقدم التالي/ }))
 
     expect(screen.queryByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' })).toBeNull()
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
