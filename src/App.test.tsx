@@ -400,7 +400,11 @@ describe('Interview management system', () => {
     }
     await user.click(screen.getAllByRole('radio', { name: 'لا' })[0])
     await user.click(screen.getAllByRole('radio', { name: 'نعم' })[2])
+    expect(within(screen.getByRole('group', { name: 'هل يوجد صعوبة او إعاقة مصاحبة قد تؤثر على التدريب' })).getByRole('radio', { name: 'لا' })).toHaveProperty('checked', true)
+    expect(within(screen.getByRole('group', { name: 'هل يتقن لغة الإشارة' })).getByRole('radio', { name: 'نعم' })).toHaveProperty('checked', true)
     fireEvent.change(screen.getByPlaceholderText('ملاحظات المقيم'), { target: { value: 'مرشح مناسب للقسم.' } })
+    expect(within(screen.getByRole('group', { name: 'هل يوجد صعوبة او إعاقة مصاحبة قد تؤثر على التدريب' })).getByRole('radio', { name: 'لا' })).toHaveProperty('checked', true)
+    expect(within(screen.getByRole('group', { name: 'هل يتقن لغة الإشارة' })).getByRole('radio', { name: 'نعم' })).toHaveProperty('checked', true)
     expect(within(screen.getByLabelText('درجة المتقدم الحالية')).getByText('45 / 50')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /عرض الدرجة للمراجعة قبل الانتقال/ }))
     expect(screen.getByText('الدرجة جاهزة للمراجعة: 45 من 50')).toBeTruthy()

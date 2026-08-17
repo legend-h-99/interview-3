@@ -1580,6 +1580,13 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const [questionScoreDrafts, setQuestionScoreDrafts] = useState<string[]>([])
   const [touchedQuestionScores, setTouchedQuestionScores] = useState<boolean[]>([])
   const [notesDraft, setNotesDraft] = useState(selected.notes)
+  const [yesNoDrafts, setYesNoDrafts] = useState<Pick<ReturnType<typeof normalizeScores>, 'hasAssociatedDifficulty' | 'weakHearing' | 'knowsSignLanguage' | 'weakMentalAbilities' | 'distinguished'>>({
+    hasAssociatedDifficulty: '',
+    weakHearing: '',
+    knowsSignLanguage: '',
+    weakMentalAbilities: '',
+    distinguished: '',
+  })
   const [reviewReady, setReviewReady] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
   const selectedStaff = selectedStaffIds
@@ -1605,6 +1612,13 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     setSelectedStaffIds(committeeNumber ? activeApplicant.committeeTrainerIds ?? [] : [])
     setEditForm(applicantToForm(activeApplicant))
     setNotesDraft(activeApplicant.notes)
+    setYesNoDrafts({
+      hasAssociatedDifficulty: selectedScores.hasAssociatedDifficulty,
+      weakHearing: selectedScores.weakHearing,
+      knowsSignLanguage: selectedScores.knowsSignLanguage,
+      weakMentalAbilities: selectedScores.weakMentalAbilities,
+      distinguished: selectedScores.distinguished,
+    })
     setReviewReady(false)
     setValidationMessage('')
     const storedQuestionScores = activeApplicant.scores.questionScores
@@ -1655,9 +1669,11 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   }
 
   const setYesNo = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'hasAssociatedDifficulty' | 'weakHearing' | 'knowsSignLanguage' | 'weakMentalAbilities' | 'distinguished'>, value: YesNo) => {
+    const nextDrafts = { ...yesNoDrafts, [key]: value }
+    setYesNoDrafts(nextDrafts)
     setReviewReady(false)
     setValidationMessage('')
-    updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
+    updateApplicant(activeApplicant.id, { scores: { ...selectedScores, ...nextDrafts }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
   }
 
   const saveApplicantData = () => {
@@ -1679,6 +1695,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     setValidationMessage('')
     const finalScores = {
       ...selectedScores,
+      ...yesNoDrafts,
       questionScores: questionScoreDrafts.map((score) => Number(score)),
       generalInfo: questionDraftTotal,
     }
@@ -1832,11 +1849,11 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
           </div>
           <Range label="سرعة الاستجابة للتعليمات" max={5} value={selectedScores.responseSpeed} onChange={(value) => setScore('responseSpeed', value)} />
           <div className="yes-no-grid">
-            <YesNoField label="هل يوجد صعوبة او إعاقة مصاحبة قد تؤثر على التدريب" value={selectedScores.hasAssociatedDifficulty} onChange={(value) => setYesNo('hasAssociatedDifficulty', value)} />
-            <YesNoField label="هل المتقدم ضعيف سمع" value={selectedScores.weakHearing} onChange={(value) => setYesNo('weakHearing', value)} />
-            <YesNoField label="هل يتقن لغة الإشارة" value={selectedScores.knowsSignLanguage} onChange={(value) => setYesNo('knowsSignLanguage', value)} />
-            <YesNoField label="هل لديه ضعف عام بالقدرات العقلية والاستيعاب" value={selectedScores.weakMentalAbilities} onChange={(value) => setYesNo('weakMentalAbilities', value)} />
-            <YesNoField label="هل المتقدم متميز" value={selectedScores.distinguished} onChange={(value) => setYesNo('distinguished', value)} />
+            <YesNoField label="هل يوجد صعوبة او إعاقة مصاحبة قد تؤثر على التدريب" name="has-associated-difficulty" value={yesNoDrafts.hasAssociatedDifficulty} onChange={(value) => setYesNo('hasAssociatedDifficulty', value)} />
+            <YesNoField label="هل المتقدم ضعيف سمع" name="weak-hearing" value={yesNoDrafts.weakHearing} onChange={(value) => setYesNo('weakHearing', value)} />
+            <YesNoField label="هل يتقن لغة الإشارة" name="knows-sign-language" value={yesNoDrafts.knowsSignLanguage} onChange={(value) => setYesNo('knowsSignLanguage', value)} />
+            <YesNoField label="هل لديه ضعف عام بالقدرات العقلية والاستيعاب" name="weak-mental-abilities" value={yesNoDrafts.weakMentalAbilities} onChange={(value) => setYesNo('weakMentalAbilities', value)} />
+            <YesNoField label="هل المتقدم متميز" name="distinguished" value={yesNoDrafts.distinguished} onChange={(value) => setYesNo('distinguished', value)} />
           </div>
           <textarea value={notesDraft} onChange={(event) => setNotes(event.target.value)} placeholder="ملاحظات المقيم" />
         </div>
@@ -1867,12 +1884,12 @@ function ScoreInput({ label, value, max, onChange }: { label: string; value: num
   )
 }
 
-function YesNoField({ label, value, onChange }: { label: string; value: YesNo; onChange: (value: YesNo) => void }) {
+function YesNoField({ label, name, value, onChange }: { label: string; name: string; value: YesNo; onChange: (value: YesNo) => void }) {
   return (
     <fieldset className="yes-no-field">
       <legend>{label}</legend>
-      <label><input checked={value === 'نعم'} onChange={() => onChange('نعم')} type="radio" /> نعم</label>
-      <label><input checked={value === 'لا'} onChange={() => onChange('لا')} type="radio" /> لا</label>
+      <label><input checked={value === 'نعم'} name={name} onChange={() => onChange('نعم')} type="radio" /> نعم</label>
+      <label><input checked={value === 'لا'} name={name} onChange={() => onChange('لا')} type="radio" /> لا</label>
     </fieldset>
   )
 }
