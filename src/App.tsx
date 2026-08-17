@@ -19,7 +19,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
 
@@ -779,6 +779,7 @@ function App() {
   const [applicantSubmitState, setApplicantSubmitState] = useState({ loading: false, message: '' })
   const [form, setForm] = useState<ApplicantForm>(emptyApplicantForm)
   const [capacityState, setCapacityState] = useState({ active: 0, max: maxConcurrentUsers, blocked: false })
+  const updateSequenceRef = useRef<Record<string, number>>({})
 
   const selected = applicants.find((applicant) => applicant.id === selectedId) ?? applicants[0] ?? seedApplicants[0]
   const stats = useMemo(() => {
@@ -824,6 +825,8 @@ function App() {
   }, [])
 
   const updateApplicant = async (id: string, patch: Partial<Applicant>, audit?: string) => {
+    const sequence = (updateSequenceRef.current[id] ?? 0) + 1
+    updateSequenceRef.current[id] = sequence
     const next = applicants.map((applicant) =>
       applicant.id === id
         ? { ...applicant, ...patch, audit: audit ? [audit, ...applicant.audit].slice(0, 8) : (patch.audit ?? applicant.audit) }
@@ -837,7 +840,9 @@ function App() {
     })
     if (response.ok) {
       const data = (await response.json()) as { applicant: Applicant }
-      setApplicants((current) => current.map((applicant) => applicant.id === id ? data.applicant : applicant))
+      if (updateSequenceRef.current[id] === sequence) {
+        setApplicants((current) => current.map((applicant) => applicant.id === id ? data.applicant : applicant))
+      }
     }
   }
 
@@ -1570,7 +1575,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   selected: Applicant
   setSelectedId: (id: string) => void
   updateApplicant: (id: string, patch: Partial<Applicant>, audit?: string) => void
-  submitEvaluation: (id: string, finalPatch?: Partial<Applicant>) => void
+  submitEvaluation: (id: string, finalPatch?: Partial<Applicant>) => Promise<void>
 }) {
   const [committeeNumber, setCommitteeNumber] = useState('')
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(selected.committeeTrainerIds ?? [])
@@ -1699,10 +1704,12 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
       questionScores: questionScoreDrafts.map((score) => Number(score)),
       generalInfo: questionDraftTotal,
     }
-    await submitEvaluation(activeApplicant.id, { scores: finalScores, notes: notesDraft })
     const nextApplicant =
       applicants.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
       applicants.find((applicant) => applicant.id !== activeApplicant.id)
+    void submitEvaluation(activeApplicant.id, { scores: finalScores, notes: notesDraft }).catch(() => {
+      setValidationMessage('تم الانتقال، لكن تعذر حفظ التقييم النهائي. تحقق من الاتصال وأعد المحاولة عند الحاجة.')
+    })
     if (nextApplicant) {
       setSelectedId(nextApplicant.id)
     }

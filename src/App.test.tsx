@@ -420,6 +420,37 @@ describe('Interview management system', () => {
     expect(within(detailsPanel as HTMLElement).getByText('45 من 50')).toBeTruthy()
   })
 
+  it('moves to the next applicant without waiting for the final save response', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لجان المقابلات' }))
+    await user.selectOptions(screen.getByLabelText('اختيار اللجنة في المقابلات'), '1')
+    await user.selectOptions(screen.getByLabelText('اختيار المتقدم للمقابلة'), 'a1')
+    fireEvent.change(screen.getByLabelText('الإشارة'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('المظهر العام'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('سرعة الاستجابة للتعليمات'), { target: { value: '4' } })
+    for (const input of screen.getAllByLabelText(/درجة السؤال/)) {
+      fireEvent.change(input, { target: { value: '3' } })
+    }
+    await user.click(screen.getByRole('button', { name: /عرض الدرجة للمراجعة قبل الانتقال/ }))
+
+    const fetchMock = vi.mocked(fetch)
+    const fallbackFetch = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation(async (input, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      if (init?.method === 'PATCH' && String(body.audit ?? '').includes('اعتماد تقييم المدرب')) {
+        return new Promise<Response>(() => undefined)
+      }
+      if (!fallbackFetch) throw new Error('fetch mock missing')
+      return fallbackFetch(input, init)
+    })
+
+    await user.click(screen.getByRole('button', { name: /تأكيد الاعتماد والانتقال للمتقدم التالي/ }))
+
+    expect(screen.getByLabelText('المتقدم المختار للمقابلة').textContent).not.toContain('عبدالله محمد الزهراني')
+  })
+
   it('blocks interview approval until question scores are complete', async () => {
     const user = userEvent.setup()
     render(<App />)
