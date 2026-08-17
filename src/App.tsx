@@ -1847,7 +1847,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
               </label>
             ))}
           </div>
-          <Range label="سرعة الاستجابة للتعليمات" max={5} value={selectedScores.responseSpeed} onChange={(value) => setScore('responseSpeed', value)} />
+          <ScoreInput label="سرعة الاستجابة للتعليمات" max={5} value={selectedScores.responseSpeed} onChange={(value) => setScore('responseSpeed', value)} />
           <div className="yes-no-grid">
             <YesNoField label="هل يوجد صعوبة او إعاقة مصاحبة قد تؤثر على التدريب" name="has-associated-difficulty" value={yesNoDrafts.hasAssociatedDifficulty} onChange={(value) => setYesNo('hasAssociatedDifficulty', value)} />
             <YesNoField label="هل المتقدم ضعيف سمع" name="weak-hearing" value={yesNoDrafts.weakHearing} onChange={(value) => setYesNo('weakHearing', value)} />
@@ -1862,16 +1862,6 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
         </div>
       </section>
     </div>
-  )
-}
-
-function Range({ label, value, max = 100, onChange }: { label: string; value: number; max?: number; onChange: (value: number) => void }) {
-  return (
-    <label className="range">
-      <span>{label} <small>من {max}</small></span>
-      <input aria-label={label} min="0" max={max} onChange={(event) => onChange(Number(event.target.value))} type="range" value={value} />
-      <strong>{value}</strong>
-    </label>
   )
 }
 

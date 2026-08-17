@@ -46,8 +46,7 @@
 .section-title,
 .toolbar,
 .actions,
-.docs,
-.range {
+.docs {
   display: flex;
   align-items: center;
 }
@@ -1060,35 +1059,6 @@ tbody tr.selected {
   font-size: 13px;
 }
 
-.range {
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #e2e8ef;
-  border-radius: var(--radius-md);
-  min-width: 0;
-}
-
-.range span {
-  min-width: 150px;
-}
-
-.range small {
-  display: block;
-  margin-top: 2px;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-}
-
-.range input {
-  flex: 1;
-  accent-color: var(--color-action-primary);
-}
-
-.range strong {
-  min-width: 36px;
-  text-align: center;
-}
-
 .score-input {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 92px;
@@ -1560,19 +1530,6 @@ textarea:focus {
     font-size: 24px;
   }
 
-  .range {
-    flex-wrap: wrap;
-  }
-
-  .range span,
-  .range strong {
-    min-width: auto;
-  }
-
-  .range input {
-    flex-basis: 100%;
-    order: 3;
-  }
 }
 
 @media (max-width: 560px) {
