@@ -949,6 +949,7 @@ function App() {
           extraPhone: form.extraPhone,
           qualification: form.certificateType,
           gpa: 0,
+          source: 'qobool',
         }),
       })
       if (response.status === 429) {
@@ -1833,7 +1834,7 @@ function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalI
     if (!found) {
       setForm({
         ...form,
-        nationalId: /^\d+$/.test(normalizedLookup) ? normalizedLookup : form.nationalId,
+        nationalId: normalizedLookup || form.nationalId,
       })
       return
     }

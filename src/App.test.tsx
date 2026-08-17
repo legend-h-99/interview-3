@@ -40,7 +40,7 @@ beforeEach(() => {
         extraPhone: body.extraPhone,
         qualification: body.qualification || body.certificateType,
         gpa: Number(body.gpa || 0),
-        source: 'direct' as const,
+        source: body.source === 'qobool' ? 'qobool' as const : 'direct' as const,
         status: 'تم إصدار رقم الانتظار' as const,
         documents: [
           { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' as const },
@@ -88,7 +88,7 @@ describe('Interview management system', () => {
     expect(screen.getByText('W-014')).toBeTruthy()
   })
 
-  it('registers a direct applicant from the applicant portal', async () => {
+  it('registers an applicant from the applicant portal', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -107,7 +107,7 @@ describe('Interview management system', () => {
     expect(await screen.findByText('مازن صالح القحطاني')).toBeTruthy()
     expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
     expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
-    expect(screen.getByText('مسجل بشكل مباشر')).toBeTruthy()
+    expect(screen.getByText('مسجل من البوابة')).toBeTruthy()
     expect(screen.queryByText('0557779999')).toBeNull()
     expect(screen.queryByLabelText('أسئلة المقابلة العامة')).toBeNull()
   })
@@ -270,6 +270,7 @@ describe('Interview management system', () => {
 
     expect(await screen.findByText('تركي ناصر الحربي')).toBeTruthy()
     expect(screen.getAllByText(/INT-003/).length).toBeGreaterThan(0)
+    expect(screen.getByText('مسجل من البوابة')).toBeTruthy()
     expect(screen.getByLabelText('بيانات المتقدم بعد التقديم')).toBeTruthy()
     expect(screen.queryByText('0551113333')).toBeNull()
 
@@ -295,6 +296,15 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
     expect(screen.queryByLabelText('الرسوم والمؤشرات')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'توزيع حالات الطلبات' })).toBeNull()
+  })
+
+  it('accepts a free-form applicant identity from the lookup field', async () => {
+    const user = userEvent.setup()
+    window.history.pushState({}, '', '/?view=applicant')
+    render(<App />)
+
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), 'ID-تجربة-١٢٣')
+    expect((screen.getByLabelText('رقم الهوية') as HTMLInputElement).value).toBe('ID-تجربة-123')
   })
 
   it('prevents duplicate applicant registration by national ID', async () => {

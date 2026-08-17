@@ -436,7 +436,7 @@ async function createApplicant(env, request) {
     extraPhone: body.extraPhone || '',
     qualification: body.qualification || body.certificateType || '',
     gpa: toNumber(body.gpa),
-    source: 'direct',
+    source: body.source === 'qobool' ? 'qobool' : 'direct',
     status: 'تم إصدار رقم الانتظار',
     committeeTrainerIds: [],
     documents: [
