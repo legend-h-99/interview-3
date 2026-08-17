@@ -41,15 +41,11 @@ beforeEach(() => {
         qualification: body.qualification || body.certificateType,
         gpa: Number(body.gpa || 0),
         source: body.source === 'qobool' ? 'qobool' as const : 'direct' as const,
-        status: 'تم إصدار رقم الانتظار' as const,
-        documents: [
-          { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' as const },
-          { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' as const },
-          { name: 'نموذج الإقرار', status: 'معتمد' as const },
-        ],
-        scores: { technical: 0, communication: 0, motivation: 0 },
+        status: 'غير محدد' as const,
+        documents: [],
+        scores: {},
         notes: '',
-        audit: [`إنشاء طلب جديد وإصدار رقم مقابلة ${waitingNo}`],
+        audit: [],
       }
       apiApplicants = [applicant, ...apiApplicants]
       return jsonResponse({ applicant }, 201)
@@ -195,6 +191,20 @@ describe('Interview management system', () => {
     expect(analytics.results.reduce((total, item) => total + item.value, 0)).toBe(seedApplicants.length)
     expect(analytics.committees.reduce((total, item) => total + item.value, 0)).toBe(seedApplicants.length)
     expect(analytics.scores.find((item) => item.label === 'المجموع')?.max).toBe(50)
+  })
+
+  it('starts applicants without grades, evaluations, or workflow statuses', () => {
+    for (const applicant of seedApplicants) {
+      expect(applicant.status).toBe('غير محدد')
+      expect(applicant.finalResult).toBeUndefined()
+      expect(applicant.notes).toBe('')
+      expect(applicant.documents).toHaveLength(0)
+      expect(applicant.audit).toHaveLength(0)
+      expect(Object.values(applicant.scores).every((value) => {
+        if (Array.isArray(value)) return value.every((score) => score === 0)
+        return value === 0 || value === ''
+      })).toBe(true)
+    }
   })
 
   it('exports applicants and college identity to an Excel-compatible CSV file', async () => {

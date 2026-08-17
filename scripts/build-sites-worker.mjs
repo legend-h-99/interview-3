@@ -41,6 +41,7 @@ async function collectFiles(dirUrl, rootUrl = dirUrl) {
 
 const files = await collectFiles(distDir)
 const acceptedApplicants = JSON.parse(await readFile(new URL('../src/data/acceptedApplicants.json', import.meta.url), 'utf8'))
+const neutralStatus = 'غير محدد'
 const defaultInterviewScores = {
   signLanguage: 0,
   appearance: 0,
@@ -73,20 +74,16 @@ function acceptedToApplicant(item, index) {
     qualification: item.program,
     gpa: 0,
     source: 'qobool',
-    status: 'بانتظار استكمال بيانات المتقدم',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
-      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { ...defaultInterviewScores },
+    status: neutralStatus,
+    documents: [],
+    scores: {},
     notes: '',
     admissionStatus: item.admissionStatus,
     organization: item.organization,
     major: item.major,
     program: item.program,
     preferenceNo: item.preferenceNo,
-    audit: ['استيراد بيانات القبول النهائي', 'بانتظار استكمال بيانات المتقدم'],
+    audit: [],
   }
 }
 
@@ -107,19 +104,15 @@ const seedApplicants = [
     qualification: 'ثانوية عامة - مسار علمي',
     gpa: 93.4,
     source: 'qobool',
-    status: 'بانتظار المقابلة',
+    status: neutralStatus,
     committeeId: 'c1',
     committeeNumber: '1',
     committeeTrainerIds: ['s4', 's5'],
     interviewAt: '2026-08-18 09:30',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'معتمد' },
-      { name: 'الشهادة الدراسية', status: 'معتمد' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { ...defaultInterviewScores },
+    documents: [],
+    scores: {},
     notes: '',
-    audit: ['استيراد من بوابة قبول', 'اعتماد الوثائق', 'إصدار رقم انتظار'],
+    audit: [],
   },
   {
     id: 'a2',
@@ -135,15 +128,11 @@ const seedApplicants = [
     qualification: 'دبلوم حاسب',
     gpa: 88.2,
     source: 'direct',
-    status: 'بانتظار مراجعة شؤون المتدربين',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
-      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { ...defaultInterviewScores },
+    status: neutralStatus,
+    documents: [],
+    scores: {},
     notes: '',
-    audit: ['تسجيل مباشر عبر QR', 'رفع الوثائق'],
+    audit: [],
   },
   {
     id: 'a3',
@@ -160,20 +149,15 @@ const seedApplicants = [
     qualification: 'ثانوية صناعية',
     gpa: 91.7,
     source: 'qobool',
-    status: 'بانتظار اعتماد رئيس القسم',
+    status: neutralStatus,
     committeeId: 'c2',
     committeeNumber: '2',
     committeeTrainerIds: ['s6', 's7'],
     interviewAt: '2026-08-18 10:15',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'معتمد' },
-      { name: 'الشهادة الدراسية', status: 'معتمد' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { ...defaultInterviewScores, signLanguage: 22, appearance: 4, questionScores: [3, 3, 3, 2, 2], generalInfo: 13, responseSpeed: 4 },
-    notes: 'حضور جيد ومعرفة تقنية مناسبة.',
-    finalResult: 'مقبول',
-    audit: ['استيراد من بوابة قبول', 'إدخال تقييم اللجنة', 'بانتظار الاعتماد النهائي'],
+    documents: [],
+    scores: {},
+    notes: '',
+    audit: [],
   },
 ]
 const workerSource = `
@@ -437,16 +421,12 @@ async function createApplicant(env, request) {
     qualification: body.qualification || body.certificateType || '',
     gpa: toNumber(body.gpa),
     source: body.source === 'qobool' ? 'qobool' : 'direct',
-    status: 'تم إصدار رقم الانتظار',
+    status: neutralStatus,
     committeeTrainerIds: [],
-    documents: [
-      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
-      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { ...defaultInterviewScores },
+    documents: [],
+    scores: {},
     notes: '',
-    audit: [\`إنشاء طلب جديد وإصدار رقم مقابلة \${waitingNo}\`],
+    audit: [],
   };
   await insertApplicantStatement(db, applicant).run();
   return json({ applicant }, { status: 201 });
@@ -533,6 +513,20 @@ async function resetApplicants(env) {
   return json({ applicants: seedApplicants });
 }
 
+async function clearApplicantAssessments(env) {
+  const db = await ensureDb(env);
+  await db.prepare(\`UPDATE applicants SET
+    status = ?,
+    documents_json = ?,
+    scores_json = ?,
+    notes = '',
+    final_result = NULL,
+    audit_json = ?,
+    updated_at = CURRENT_TIMESTAMP
+  \`).bind(neutralStatus, '[]', '{}', '[]').run();
+  return listApplicants(env);
+}
+
 async function handleApi(request, env) {
   try {
     const url = new URL(request.url);
@@ -547,6 +541,7 @@ async function handleApi(request, env) {
     const match = url.pathname.match(/^\\/api\\/applicants\\/([^/]+)$/);
     if (!response && match && request.method === 'PATCH') response = await updateApplicant(env, request, match[1]);
     if (!response && url.pathname === '/api/reset' && request.method === 'POST') response = await resetApplicants(env);
+    if (!response && url.pathname === '/api/clear-applicant-assessments' && request.method === 'POST') response = await clearApplicantAssessments(env);
     return withCors(response || json({ error: 'Not found' }, { status: 404 }), request);
   } catch (error) {
     return withCors(json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 }), request);

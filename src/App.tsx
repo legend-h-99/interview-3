@@ -26,6 +26,7 @@ import acceptedApplicantsData from './data/acceptedApplicants.json'
 type Role = 'college' | 'trainees' | 'head' | 'committee' | 'applicant'
 type Source = 'qobool' | 'direct'
 type Status =
+  | 'غير محدد'
   | 'مستورد من بوابة قبول'
   | 'تسجيل جديد غير مكتمل'
   | 'بانتظار رفع الوثائق'
@@ -189,6 +190,7 @@ const committees: Committee[] = [
 const trainerMembers = staffMembers.filter((member) => member.task.startsWith('لجنة '))
 const translatorMembers = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
 const acceptedApplicants = acceptedApplicantsData as AcceptedApplicant[]
+const neutralStatus: Status = 'غير محدد'
 
 function normalizeImportedPhone(phone: string) {
   return phone.startsWith('5') ? `0${phone}` : phone
@@ -226,20 +228,16 @@ function acceptedToApplicant(item: AcceptedApplicant, index: number): Applicant 
     qualification: item.program,
     gpa: 0,
     source: 'qobool',
-    status: 'بانتظار استكمال بيانات المتقدم',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
-      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    status: neutralStatus,
+    documents: [],
+    scores: {},
     notes: '',
     admissionStatus: item.admissionStatus,
     organization: item.organization,
     major: item.major,
     program: item.program,
     preferenceNo: item.preferenceNo,
-    audit: ['استيراد بيانات القبول النهائي', 'بانتظار استكمال بيانات المتقدم'],
+    audit: [],
   }
 }
 
@@ -262,19 +260,15 @@ export const seedApplicants: Applicant[] = [
     qualification: 'ثانوية عامة - مسار علمي',
     gpa: 93.4,
     source: 'qobool',
-    status: 'بانتظار المقابلة',
+    status: neutralStatus,
     committeeId: 'c1',
     committeeNumber: '1',
     committeeTrainerIds: ['s4', 's5'],
     interviewAt: '2026-08-18 09:30',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'معتمد' },
-      { name: 'الشهادة الدراسية', status: 'معتمد' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    documents: [],
+    scores: {},
     notes: '',
-    audit: ['استيراد من بوابة قبول', 'اعتماد الوثائق', 'إصدار رقم انتظار'],
+    audit: [],
   },
   {
     id: 'a2',
@@ -290,15 +284,11 @@ export const seedApplicants: Applicant[] = [
     qualification: 'دبلوم حاسب',
     gpa: 88.2,
     source: 'direct',
-    status: 'بانتظار مراجعة شؤون المتدربين',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'بانتظار المراجعة' },
-      { name: 'الشهادة الدراسية', status: 'بانتظار المراجعة' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { technical: 0, communication: 0, motivation: 0 },
+    status: neutralStatus,
+    documents: [],
+    scores: {},
     notes: '',
-    audit: ['تسجيل مباشر عبر QR', 'رفع الوثائق'],
+    audit: [],
   },
   {
     id: 'a3',
@@ -315,20 +305,15 @@ export const seedApplicants: Applicant[] = [
     qualification: 'ثانوية صناعية',
     gpa: 91.7,
     source: 'qobool',
-    status: 'بانتظار اعتماد رئيس القسم',
+    status: neutralStatus,
     committeeId: 'c2',
     committeeNumber: '2',
     committeeTrainerIds: ['s6', 's7'],
     interviewAt: '2026-08-18 10:15',
-    documents: [
-      { name: 'الهوية الوطنية', status: 'معتمد' },
-      { name: 'الشهادة الدراسية', status: 'معتمد' },
-      { name: 'نموذج الإقرار', status: 'معتمد' },
-    ],
-    scores: { technical: 86, communication: 78, motivation: 92 },
-    notes: 'حضور جيد ومعرفة تقنية مناسبة.',
-    finalResult: 'مقبول',
-    audit: ['استيراد من بوابة قبول', 'إدخال تقييم اللجنة', 'بانتظار الاعتماد النهائي'],
+    documents: [],
+    scores: {},
+    notes: '',
+    audit: [],
   },
 ]
 
@@ -923,7 +908,7 @@ function App() {
           qualification: form.certificateType,
           gpa: 0,
           waitingNo: interviewNo,
-          status: 'تم إصدار رقم الانتظار',
+          status: neutralStatus,
         },
         `استكمال بيانات المتقدم وإصدار رقم مقابلة ${interviewNo}`,
       )
