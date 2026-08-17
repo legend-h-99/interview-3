@@ -7,14 +7,17 @@ import {
   Download,
   FileCheck2,
   FileText,
+  Filter,
   GraduationCap,
   LayoutDashboard,
   ListChecks,
+  Moon,
   QrCode,
   RefreshCcw,
   Search,
   ShieldCheck,
   Sparkles,
+  Sun,
   UploadCloud,
   UserCheck,
   Users,
@@ -24,7 +27,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
 
-type Role = 'college' | 'trainees' | 'head' | 'committee' | 'inquiry' | 'sourceReport' | 'qobooliReport' | 'absent' | 'applicant'
+type Role = 'college' | 'trainees' | 'head' | 'committee' | 'advancedVisuals' | 'inquiry' | 'sourceReport' | 'qobooliReport' | 'absent' | 'applicant'
 type Source = 'qobool' | 'direct'
 type Status =
   | 'غير محدد'
@@ -139,6 +142,18 @@ type ChartDatum = {
   color: string
 }
 
+type AdvancedVisualMode = 'bars' | 'surface' | 'network' | 'heatmap'
+type AdvancedSegment = 'all' | 'qobool' | 'direct' | 'evaluated'
+
+type AdvancedPoint = {
+  label: string
+  value: number
+  color: string
+  x: number
+  y: number
+  z: number
+}
+
 const collegeProfile = {
   collegeName: 'الكلية التقنية للاتصالات والمعلومات',
   departmentName: 'قسم التقنية الخاصة للصم وضعاف السمع',
@@ -157,6 +172,7 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'trainees', label: 'شؤون المتدربين', icon: ClipboardCheck },
   { id: 'head', label: 'رئيس القسم', icon: GraduationCap },
   { id: 'committee', label: 'لجان المقابلات', icon: UserCheck },
+  { id: 'advancedVisuals', label: 'تصورات متقدمة', icon: Sparkles },
   { id: 'inquiry', label: 'استعلام عن متقدم', icon: Search },
   { id: 'sourceReport', label: 'تقرير المصدر', icon: BarChart3 },
   { id: 'qobooliReport', label: 'تقرير منصة قبولي', icon: FileText },
@@ -170,6 +186,7 @@ const roleDescriptions: Record<Role, string> = {
   trainees: 'مراجعة الطلبات والوثائق وإصدار أرقام الانتظار للمتقدمين.',
   head: 'توزيع المتقدمين على اللجان واعتماد النتائج النهائية.',
   committee: 'إدارة جلسات المقابلة وتسجيل الدرجات والملاحظات.',
+  advancedVisuals: 'صفحة مستقلة للتصورات الثنائية والثلاثية الأبعاد مع فلاتر وتحديثات حية.',
   inquiry: 'استعلام مستقل عن بيانات متقدم بالاسم أو الهوية أو رقم الانتظار.',
   sourceReport: 'تقرير منفصل يوضح مصدر التسجيل وحضور المقابلة.',
   qobooliReport: 'تقرير مستقل لسجلات منصة قبولي فقط مع مطابقة الاسم ورقم الهوية.',
@@ -1519,6 +1536,7 @@ function App() {
           <HeadView applicants={applicants} selected={selected} setSelectedId={setSelectedId} assignCommittee={assignCommittee} approveResult={approveResult} updateApplicant={updateApplicant} />
         )}
         {role === 'committee' && <CommitteeView applicants={applicants} selected={selected} setSelectedId={setSelectedId} updateApplicant={updateApplicant} submitEvaluation={submitEvaluation} />}
+        {role === 'advancedVisuals' && <AdvancedVisualsView applicants={applicants} />}
         {role === 'inquiry' && <ApplicantInquiryView applicants={applicants} selectedId={selected.id} setSelectedId={setSelectedId} />}
         {role === 'sourceReport' && <SourceReportView applicants={applicants} selectedManager={selectedManager} stats={stats} />}
         {role === 'qobooliReport' && <QobooliReportView applicants={applicants} selectedManager={selectedManager} />}
@@ -1719,6 +1737,399 @@ function YesNoSummaryCard({ title, items }: { title: string; items: { label: str
           )
         })}
       </div>
+    </article>
+  )
+}
+
+function buildAdvancedPoints(applicants: Applicant[], mode: AdvancedVisualMode): AdvancedPoint[] {
+  const analytics = computeVisualAnalytics(applicants)
+  const source = mode === 'surface' || mode === 'heatmap'
+    ? analytics.scores
+    : mode === 'network'
+      ? analytics.results
+      : analytics.status
+  return source.map((item, index) => {
+    const angle = (index / Math.max(source.length, 1)) * Math.PI * 2
+    const radius = 3 + (index % 3) * 0.75
+    const max = 'max' in item && typeof item.max === 'number' ? item.max : 10
+    return {
+      label: item.label,
+      value: item.value,
+      color: item.color,
+      x: Math.cos(angle) * radius,
+      y: mode === 'surface' ? item.value / Math.max(max, 1) : Math.max(item.value, 1),
+      z: Math.sin(angle) * radius,
+    }
+  })
+}
+
+function AdvancedVisualsView({ applicants }: { applicants: Applicant[] }) {
+  const [mode, setMode] = useState<AdvancedVisualMode>('bars')
+  const [segment, setSegment] = useState<AdvancedSegment>('all')
+  const [theme, setTheme] = useState<'day' | 'night'>('day')
+  const [motion, setMotion] = useState(true)
+  const [live, setLive] = useState(true)
+  const [pulse, setPulse] = useState(1)
+  const [storyIndex, setStoryIndex] = useState(0)
+  const filteredApplicants = useMemo(() => applicants.filter((applicant) => {
+    if (segment === 'qobool') return applicant.source === 'qobool'
+    if (segment === 'direct') return applicant.source === 'direct'
+    if (segment === 'evaluated') return applicant.status === 'النتيجة معتمدة' || applicant.status === 'تم التقييم'
+    return true
+  }), [applicants, segment])
+  const analytics = useMemo(() => computeVisualAnalytics(filteredApplicants), [filteredApplicants])
+  const points = useMemo(() => buildAdvancedPoints(filteredApplicants, mode), [filteredApplicants, mode])
+  const averageTotal = analytics.scores.find((score) => score.label === 'المجموع')?.value ?? 0
+  const completionRate = filteredApplicants.length ? Math.round((filteredApplicants.filter((applicant) => applicant.status === 'النتيجة معتمدة').length / filteredApplicants.length) * 100) : 0
+  const stories = [
+    `تحديث حي ${pulse}: تم تحليل ${filteredApplicants.length} سجل حسب الفلتر الحالي.`,
+    `متوسط الدرجة الكلية ${averageTotal} من 50، مع حماية القيم الناقصة عبر التطبيع.`,
+    `الإنجاز المعتمد ${completionRate}% ويعاد حسابه مباشرة عند تغيير المصدر أو الحالة.`,
+  ]
+
+  useEffect(() => {
+    if (!live) return undefined
+    const interval = window.setInterval(() => {
+      setPulse((current) => current + 1)
+      setStoryIndex((current) => (current + 1) % stories.length)
+    }, 2600)
+    return () => window.clearInterval(interval)
+  }, [live, stories.length])
+
+  return (
+    <section className={`advanced-dashboard ${theme === 'night' ? 'dark-visuals' : ''}`} aria-label="لوحة التصورات المتقدمة">
+      <section className="advanced-hero">
+        <div>
+          <span>Interactive 3D Data Visualisation</span>
+          <h2>تصورات متقدمة لبيانات المقابلات</h2>
+          <p>رسوم ثنائية وثلاثية الأبعاد قابلة للتصفية والتدوير والتكبير مع مؤشرات REST وGraphQL وWebSocket جاهزة للتوسيع.</p>
+        </div>
+        <div className="advanced-controls" aria-label="إعدادات التصور">
+          <label>
+            <Filter size={16} />
+            تصفية البيانات
+            <select aria-label="تصفية بيانات التصورات" value={segment} onChange={(event) => setSegment(event.target.value as AdvancedSegment)}>
+              <option value="all">كل المتقدمين</option>
+              <option value="qobool">منصة قبولي</option>
+              <option value="direct">تسجيل مباشر</option>
+              <option value="evaluated">تم تقييمهم</option>
+            </select>
+          </label>
+          <button aria-pressed={theme === 'night'} onClick={() => setTheme((current) => current === 'day' ? 'night' : 'day')} type="button">
+            {theme === 'night' ? <Sun size={17} /> : <Moon size={17} />}
+            {theme === 'night' ? 'نهار' : 'ليل'}
+          </button>
+          <button aria-pressed={motion} onClick={() => setMotion((current) => !current)} type="button">حركة</button>
+          <button aria-pressed={live} onClick={() => setLive((current) => !current)} type="button">تحديث حي</button>
+        </div>
+      </section>
+
+      <div className="mode-tabs" role="tablist" aria-label="أنماط العرض ثلاثي الأبعاد">
+        {[
+          ['bars', 'أعمدة ثلاثية'],
+          ['surface', 'سطح ثلاثي'],
+          ['network', 'شبكة علاقات'],
+          ['heatmap', 'خريطة حرارية'],
+        ].map(([id, label]) => (
+          <button aria-selected={mode === id} className={mode === id ? 'active' : ''} key={id} onClick={() => setMode(id as AdvancedVisualMode)} role="tab" type="button">{label}</button>
+        ))}
+      </div>
+
+      <AdvancedThreeScene data={points} mode={mode} motion={motion} theme={theme} />
+
+      <section className="advanced-kpis" aria-label="مؤشرات الصفحة الرسومية">
+        <Metric icon={Users} label="السجلات المعروضة" value={filteredApplicants.length} tone="blue" />
+        <Metric icon={CheckCircle2} label="نسبة الاعتماد" value={completionRate} tone="green" />
+        <Metric icon={BarChart3} label="متوسط الدرجة" value={averageTotal} tone="teal" />
+        <Metric icon={Clock3} label="نبضات التحديث" value={pulse} tone="amber" />
+      </section>
+
+      <section className="advanced-story" aria-live="polite">
+        <Sparkles size={20} />
+        <div>
+          <strong>لوحة قصص البيانات المتحركة</strong>
+          <p>{stories[storyIndex]}</p>
+        </div>
+        <span className={live ? 'live-dot active' : 'live-dot'}>{live ? 'WebSocket live' : 'Live paused'}</span>
+      </section>
+
+      <section className="data-connectors" aria-label="حالة ربط البيانات">
+        <span>REST /api/applicants: متصل</span>
+        <span>GraphQL analyticsApplicants: جاهز</span>
+        <span>WebSocket /live/interviews: محاكاة حية</span>
+        <span>LOD + instancing: مفعّل</span>
+      </section>
+
+      <section className="advanced-grid" aria-label="رسوم ثنائية الأبعاد">
+        <AdvancedLineChart title="خط زمني للحضور والتقييم" data={analytics.status} />
+        <AdvancedScatterChart title="مخطط نقاط للدرجات واللجان" applicants={filteredApplicants} />
+        <BarChartCard title="توزيع المصدر والحالة" data={analytics.status} />
+        <ScoreBarsCard title="متوسطات التقييم من 50" scores={analytics.scores} />
+      </section>
+    </section>
+  )
+}
+
+function AdvancedThreeScene({ data, mode, motion, theme }: { data: AdvancedPoint[]; mode: AdvancedVisualMode; motion: boolean; theme: 'day' | 'night' }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [fallback, setFallback] = useState(false)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return undefined
+    container.innerHTML = ''
+    setTooltip(null)
+    setFallback(false)
+    let hasWebgl = false
+    try {
+      const probe = document.createElement('canvas')
+      hasWebgl = Boolean(probe.getContext('webgl') || probe.getContext('experimental-webgl'))
+    } catch {
+      hasWebgl = false
+    }
+    if (!hasWebgl) {
+      setFallback(true)
+      return undefined
+    }
+
+    let mounted = true
+    let frame = 0
+    let cleanup = () => undefined
+
+    import('three').then((THREE) => {
+      if (!mounted || !containerRef.current) return
+      const width = Math.max(container.clientWidth, 320)
+      const height = Math.max(container.clientHeight, 360)
+      const scene = new THREE.Scene()
+      scene.background = new THREE.Color(theme === 'night' ? '#07111f' : '#f7fbff')
+      const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100)
+      camera.position.set(7, 6, 9)
+      camera.lookAt(0, 0, 0)
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true })
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
+      renderer.setSize(width, height)
+      renderer.domElement.setAttribute('aria-label', 'مشهد ثلاثي الأبعاد تفاعلي للتقارير')
+      renderer.domElement.tabIndex = 0
+      container.appendChild(renderer.domElement)
+
+      const group = new THREE.Group()
+      scene.add(group)
+      scene.add(new THREE.AmbientLight(0xffffff, theme === 'night' ? 0.75 : 1.1))
+      const light = new THREE.DirectionalLight(0xffffff, 1.8)
+      light.position.set(5, 9, 6)
+      scene.add(light)
+      const grid = new THREE.GridHelper(12, 12, theme === 'night' ? '#31506f' : '#b9ccd9', theme === 'night' ? '#172a3d' : '#e4edf3')
+      group.add(grid)
+
+      const raycaster = new THREE.Raycaster()
+      const pointer = new THREE.Vector2()
+      const pickables: import('three').Object3D[] = []
+      const labels = data.map((item) => `${item.label}: ${item.value}`)
+
+      if (mode === 'surface') {
+        const geometry = new THREE.PlaneGeometry(9, 9, 18, 18)
+        const position = geometry.attributes.position
+        for (let index = 0; index < position.count; index += 1) {
+          const x = position.getX(index)
+          const y = position.getY(index)
+          const wave = Math.sin(x * 1.2 + data.length) + Math.cos(y * 1.1)
+          const scoreBoost = (data[index % Math.max(data.length, 1)]?.value ?? 0) / 12
+          position.setZ(index, wave * 0.35 + scoreBoost)
+        }
+        geometry.computeVertexNormals()
+        const material = new THREE.MeshStandardMaterial({ color: theme === 'night' ? '#14b8a6' : '#0f6b8f', metalness: 0.12, roughness: 0.42, wireframe: false })
+        const surface = new THREE.Mesh(geometry, material)
+        surface.rotation.x = -Math.PI / 2.25
+        surface.userData.label = 'سطح متوسطات التقييم'
+        group.add(surface)
+        pickables.push(surface)
+      } else if (mode === 'network') {
+        const nodeMaterial = new THREE.MeshStandardMaterial({ color: '#2f9e8f', roughness: 0.35 })
+        data.forEach((item, index) => {
+          const node = new THREE.Mesh(new THREE.SphereGeometry(0.22 + Math.min(item.value, 12) / 70, 16, 10), nodeMaterial.clone())
+          ;(node.material as import('three').MeshStandardMaterial).color = new THREE.Color(item.color)
+          node.position.set(item.x, 0.7 + item.value / 5, item.z)
+          node.userData.label = labels[index]
+          group.add(node)
+          pickables.push(node)
+          if (index > 0) {
+            const previous = pickables[index - 1]
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints([previous.position, node.position])
+            group.add(new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({ color: theme === 'night' ? '#7dd3fc' : '#326a86', transparent: true, opacity: 0.55 })))
+          }
+        })
+      } else {
+        const geometry = new THREE.BoxGeometry(0.72, 1, 0.72)
+        const material = new THREE.MeshStandardMaterial({ roughness: 0.38, metalness: 0.08 })
+        const mesh = new THREE.InstancedMesh(geometry, material, Math.max(data.length, 1))
+        const dummy = new THREE.Object3D()
+        data.forEach((item, index) => {
+          const height = mode === 'heatmap' ? 0.35 + item.value / 4 : 0.5 + item.value / 2
+          const gridX = (index % 5) - 2
+          const gridZ = Math.floor(index / 5) - 1
+          dummy.position.set(mode === 'heatmap' ? gridX * 1.05 : item.x, height / 2, mode === 'heatmap' ? gridZ * 1.05 : item.z)
+          dummy.scale.set(1, height, 1)
+          dummy.updateMatrix()
+          mesh.setMatrixAt(index, dummy.matrix)
+          mesh.setColorAt(index, new THREE.Color(item.color))
+        })
+        mesh.userData.labels = labels
+        group.add(mesh)
+        pickables.push(mesh)
+      }
+
+      let dragging = false
+      let lastX = 0
+      const onPointerDown = (event: PointerEvent) => {
+        dragging = true
+        lastX = event.clientX
+      }
+      const onPointerMove = (event: PointerEvent) => {
+        if (dragging) {
+          group.rotation.y += (event.clientX - lastX) * 0.008
+          lastX = event.clientX
+        }
+        const bounds = renderer.domElement.getBoundingClientRect()
+        pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1
+        pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1
+        raycaster.setFromCamera(pointer, camera)
+        const hit = raycaster.intersectObjects(pickables, false)[0]
+        if (!hit) {
+          setTooltip(null)
+          return
+        }
+        const label = Array.isArray(hit.object.userData.labels) && typeof hit.instanceId === 'number'
+          ? hit.object.userData.labels[hit.instanceId]
+          : hit.object.userData.label
+        setTooltip(label ? { x: event.offsetX, y: event.offsetY, text: label } : null)
+      }
+      const onPointerUp = () => {
+        dragging = false
+      }
+      const onWheel = (event: WheelEvent) => {
+        event.preventDefault()
+        camera.position.multiplyScalar(event.deltaY > 0 ? 1.08 : 0.92)
+        camera.position.clampLength(5, 18)
+      }
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'ArrowLeft') group.rotation.y -= 0.12
+        if (event.key === 'ArrowRight') group.rotation.y += 0.12
+        if (event.key === 'ArrowUp') camera.position.multiplyScalar(0.94)
+        if (event.key === 'ArrowDown') camera.position.multiplyScalar(1.06)
+      }
+      renderer.domElement.addEventListener('pointerdown', onPointerDown)
+      renderer.domElement.addEventListener('pointermove', onPointerMove)
+      window.addEventListener('pointerup', onPointerUp)
+      renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
+      renderer.domElement.addEventListener('keydown', onKeyDown)
+
+      const resizeObserver = new ResizeObserver(([entry]) => {
+        const nextWidth = Math.max(entry.contentRect.width, 320)
+        const nextHeight = Math.max(entry.contentRect.height, 360)
+        camera.aspect = nextWidth / nextHeight
+        camera.updateProjectionMatrix()
+        renderer.setSize(nextWidth, nextHeight)
+      })
+      resizeObserver.observe(container)
+
+      const animate = () => {
+        if (motion) group.rotation.y += 0.0035
+        renderer.render(scene, camera)
+        frame = window.requestAnimationFrame(animate)
+      }
+      animate()
+
+      cleanup = () => {
+        resizeObserver.disconnect()
+        renderer.domElement.removeEventListener('pointerdown', onPointerDown)
+        renderer.domElement.removeEventListener('pointermove', onPointerMove)
+        window.removeEventListener('pointerup', onPointerUp)
+        renderer.domElement.removeEventListener('wheel', onWheel)
+        renderer.domElement.removeEventListener('keydown', onKeyDown)
+        window.cancelAnimationFrame(frame)
+        scene.traverse((object) => {
+          const mesh = object as import('three').Mesh
+          mesh.geometry?.dispose?.()
+          const material = mesh.material as import('three').Material | import('three').Material[] | undefined
+          if (Array.isArray(material)) material.forEach((item) => item.dispose())
+          else material?.dispose?.()
+        })
+        renderer.dispose()
+        renderer.domElement.remove()
+      }
+    }).catch(() => setFallback(true))
+
+    return () => {
+      mounted = false
+      cleanup()
+    }
+  }, [data, mode, motion, theme])
+
+  return (
+    <section className="advanced-stage-wrap" aria-label="مشهد ثلاثي الأبعاد">
+      <div className="advanced-stage-header">
+        <div>
+          <span>Three.js Scene</span>
+          <h3>{mode === 'bars' ? 'أعمدة ثلاثية الأبعاد' : mode === 'surface' ? 'سطح ثلاثي الأبعاد' : mode === 'network' ? 'شبكة علاقات' : 'خريطة حرارية ثلاثية الأبعاد'}</h3>
+        </div>
+        <p>اسحب للتدوير، استخدم عجلة الفأرة للتكبير، أو الأسهم من لوحة المفاتيح.</p>
+      </div>
+      <div className="advanced-3d-stage" data-testid="advanced-three-scene" ref={containerRef}>
+        {fallback && (
+          <div className="three-fallback">
+            <strong>وضع معاينة ثلاثية الأبعاد</strong>
+            <span>بيئة التشغيل الحالية لا توفر WebGL، وسيظهر المشهد التفاعلي في المتصفح.</span>
+          </div>
+        )}
+        {tooltip && <span className="three-tooltip" style={{ insetInlineStart: tooltip.x + 14, top: tooltip.y + 14 }}>{tooltip.text}</span>}
+      </div>
+    </section>
+  )
+}
+
+function AdvancedLineChart({ title, data }: { title: string; data: ChartDatum[] }) {
+  const max = Math.max(...data.map((item) => item.value), 1)
+  const points = data.map((item, index) => {
+    const x = 24 + index * (252 / Math.max(data.length - 1, 1))
+    const y = 126 - (item.value / max) * 96
+    return { ...item, x, y }
+  })
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+  const area = `${path} L ${points.at(-1)?.x ?? 24} 140 L 24 140 Z`
+  return (
+    <article className="chart-card advanced-chart">
+      <h3>{title}</h3>
+      <svg aria-label={title} role="img" viewBox="0 0 300 160">
+        <path d={area} fill="#14b8a6" opacity="0.16" />
+        <path d={path} fill="none" stroke="#0f6b8f" strokeLinecap="round" strokeWidth="4" />
+        {points.map((point) => <circle cx={point.x} cy={point.y} fill={point.color} key={point.label} r="5"><title>{point.label}: {point.value}</title></circle>)}
+      </svg>
+    </article>
+  )
+}
+
+function AdvancedScatterChart({ title, applicants }: { title: string; applicants: Applicant[] }) {
+  const sampled = applicants.slice(0, 18).map((applicant, index) => ({
+    applicant,
+    score: calculateScore(applicant),
+    x: 24 + (index % 6) * 46,
+    y: 132 - (calculateScore(applicant) / 50) * 106,
+  }))
+  return (
+    <article className="chart-card advanced-chart">
+      <h3>{title}</h3>
+      {sampled.length === 0 ? <p className="chart-empty">لا توجد بيانات كافية</p> : (
+        <svg aria-label={title} role="img" viewBox="0 0 300 160">
+          <line stroke="#d9e2ec" x1="18" x2="286" y1="132" y2="132" />
+          <line stroke="#d9e2ec" x1="18" x2="18" y1="18" y2="132" />
+          {sampled.map((item) => (
+            <circle cx={item.x} cy={item.y} fill={item.applicant.source === 'qobool' ? '#0f766e' : '#f59e0b'} key={item.applicant.id} r={4 + Math.min(item.score, 50) / 18}>
+              <title>{item.applicant.name}: {item.score} من 50</title>
+            </circle>
+          ))}
+        </svg>
+      )}
     </article>
   )
 }

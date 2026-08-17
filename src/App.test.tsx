@@ -184,6 +184,28 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'متوسطات التقييم' })).toBeTruthy()
   })
 
+  it('shows the advanced interactive data visualization page with filters and modes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'تصورات متقدمة' }))
+
+    expect(screen.getByRole('heading', { name: 'تصورات متقدمة' })).toBeTruthy()
+    expect(screen.getByText('تصورات متقدمة لبيانات المقابلات')).toBeTruthy()
+    expect(screen.getByTestId('advanced-three-scene')).toBeTruthy()
+    expect(screen.getByText('REST /api/applicants: متصل')).toBeTruthy()
+    expect(screen.getByText('GraphQL analyticsApplicants: جاهز')).toBeTruthy()
+    expect(screen.getByText('WebSocket /live/interviews: محاكاة حية')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'خط زمني للحضور والتقييم' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'مخطط نقاط للدرجات واللجان' })).toBeTruthy()
+
+    await user.selectOptions(screen.getByLabelText('تصفية بيانات التصورات'), 'qobool')
+    await user.click(screen.getByRole('tab', { name: 'خريطة حرارية' }))
+
+    expect(screen.getByRole('tab', { name: 'خريطة حرارية' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('خريطة حرارية ثلاثية الأبعاد')).toBeTruthy()
+  })
+
   it('supports a separate applicant inquiry page', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -458,6 +480,7 @@ describe('Interview management system', () => {
 
     expect(screen.getByRole('heading', { name: 'بوابة المتقدمين' })).toBeTruthy()
     expect(screen.queryByLabelText('الرسوم والمؤشرات')).toBeNull()
+    expect(screen.queryByLabelText('لوحة التصورات المتقدمة')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'توزيع حالات الطلبات' })).toBeNull()
   })
 
