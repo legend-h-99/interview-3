@@ -24,7 +24,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
 
-type Role = 'college' | 'trainees' | 'head' | 'committee' | 'absent' | 'applicant'
+type Role = 'college' | 'trainees' | 'head' | 'committee' | 'inquiry' | 'sourceReport' | 'absent' | 'applicant'
 type Source = 'qobool' | 'direct'
 type Status =
   | 'غير محدد'
@@ -157,6 +157,8 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'trainees', label: 'شؤون المتدربين', icon: ClipboardCheck },
   { id: 'head', label: 'رئيس القسم', icon: GraduationCap },
   { id: 'committee', label: 'لجان المقابلات', icon: UserCheck },
+  { id: 'inquiry', label: 'استعلام عن متقدم', icon: Search },
+  { id: 'sourceReport', label: 'تقرير المصدر', icon: BarChart3 },
   { id: 'absent', label: 'لم يحضروا المقابلة', icon: Clock3 },
   { id: 'applicant', label: 'واجهة المتقدم', icon: QrCode },
 ]
@@ -167,6 +169,8 @@ const roleDescriptions: Record<Role, string> = {
   trainees: 'مراجعة الطلبات والوثائق وإصدار أرقام الانتظار للمتقدمين.',
   head: 'توزيع المتقدمين على اللجان واعتماد النتائج النهائية.',
   committee: 'إدارة جلسات المقابلة وتسجيل الدرجات والملاحظات.',
+  inquiry: 'استعلام مستقل عن بيانات متقدم بالاسم أو الهوية أو رقم الانتظار.',
+  sourceReport: 'تقرير منفصل يوضح مصدر التسجيل وحضور المقابلة.',
   absent: 'تقرير خاص بالمسجلين من البوابة ولم يحضروا المقابلة.',
   applicant: 'تسجيل طلب جديد أو متابعة حالة الطلب برقم الهوية.',
 }
@@ -387,7 +391,7 @@ const noShowStatus: Status = 'معتذر أو لم يحضر'
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
 const fullInterviewScore = 50
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'عدد المسجلين من البوابة وحضروا المقابلة', 'عدد الذين لم يحضروا المقابلة', 'عدد المسجلين بشكل مباشر', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 let fallbackSessionId = ''
 
@@ -483,6 +487,23 @@ function getPortalNoShowApplicants(applicants: Applicant[]) {
   return applicants.filter((applicant) => applicant.source === 'qobool' && applicant.status === noShowStatus)
 }
 
+function hasAttendedInterview(applicant: Applicant) {
+  return ['المقابلة جارية', 'تم التقييم', 'بانتظار اعتماد رئيس القسم', 'النتيجة معتمدة'].includes(applicant.status)
+}
+
+function getSourceStats(applicants: Applicant[]) {
+  const portalApplicants = applicants.filter((applicant) => applicant.source === 'qobool')
+  const portalAttended = portalApplicants.filter(hasAttendedInterview).length
+  const portalNoShows = getPortalNoShowApplicants(applicants).length
+  const directApplicants = applicants.filter((applicant) => applicant.source === 'direct').length
+  return {
+    portalApplicants: portalApplicants.length,
+    portalAttended,
+    portalNoShows,
+    directApplicants,
+  }
+}
+
 function applicantToForm(applicant: Applicant): ApplicantForm {
   return {
     nationalId: applicant.nationalId,
@@ -533,6 +554,7 @@ function normalizeScores(scores: InterviewScores = {}) {
 }
 
 function buildApplicantReportRows(applicants: Applicant[], selectedManager: CollegeManager) {
+  const sourceStats = getSourceStats(applicants)
   const rows = applicants.map((applicant) => {
     const scores = normalizeScores(applicant.scores)
     return [
@@ -563,6 +585,9 @@ function buildApplicantReportRows(applicants: Applicant[], selectedManager: Coll
       scores.responseSpeed,
       fullInterviewScore,
       calculateScore(applicant),
+      sourceStats.portalAttended,
+      sourceStats.portalNoShows,
+      sourceStats.directApplicants,
       scores.hasAssociatedDifficulty,
       scores.weakHearing,
       scores.knowsSignLanguage,
@@ -636,10 +661,13 @@ function exportApplicantsPptx(applicants: Applicant[], selectedManager: CollegeM
   const title = fileLabel === 'portal-no-shows' ? 'تقرير عدم حضور مقابلات البوابة' : 'تقرير منصة interview 3'
   const totalPortal = applicants.filter((item) => item.source === 'qobool').length
   const noShows = getPortalNoShowApplicants(applicants).length
+  const sourceStats = getSourceStats(applicants)
   const metricLines = [
     `إجمالي المتقدمين: ${applicants.length}`,
     `المسجلون من البوابة: ${totalPortal}`,
+    `من البوابة وحضروا المقابلة: ${sourceStats.portalAttended}`,
     `لم يحضروا المقابلة: ${noShows}`,
+    `المسجلون بشكل مباشر: ${sourceStats.directApplicants}`,
     `الدرجة الكاملة: ${fullInterviewScore}`,
     `متوسط المجموع: ${averageScore(applicants, (_scores, applicant) => calculateScore(applicant))}`,
     `نتائج معتمدة: ${applicants.filter((item) => item.status === 'النتيجة معتمدة').length}`,
@@ -841,8 +869,29 @@ function pdfYesNoSummary(items: ReturnType<typeof computeVisualAnalytics>['yesNo
   `
 }
 
+function pdfSourceSummary(applicants: Applicant[]) {
+  const sourceStats = getSourceStats(applicants)
+  return `
+    <section class="source-summary">
+      <h2>تقرير المصدر والحضور</h2>
+      <table>
+        <thead>
+          <tr><th>المؤشر</th><th>العدد</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>المسجلون من البوابة</td><td>${sourceStats.portalApplicants}</td></tr>
+          <tr><td>المسجلون من البوابة وحضروا المقابلة</td><td>${sourceStats.portalAttended}</td></tr>
+          <tr><td>الذين لم يحضروا المقابلة</td><td>${sourceStats.portalNoShows}</td></tr>
+          <tr><td>المسجلون بشكل مباشر</td><td>${sourceStats.directApplicants}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  `
+}
+
 function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
   const noShows = getPortalNoShowApplicants(applicants)
+  const sourceStats = getSourceStats(applicants)
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
   const rows = noShows.map((applicant, index) => `
@@ -897,7 +946,9 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
         </section>
         <section class="metrics">
           <div class="metric"><span>إجمالي المسجلين من البوابة</span><strong>${applicants.filter((item) => item.source === 'qobool').length}</strong></div>
+          <div class="metric"><span>من البوابة وحضروا المقابلة</span><strong>${sourceStats.portalAttended}</strong></div>
           <div class="metric"><span>لم يحضروا المقابلة</span><strong>${noShows.length}</strong></div>
+          <div class="metric"><span>المسجلون بشكل مباشر</span><strong>${sourceStats.directApplicants}</strong></div>
           <div class="metric"><span>نسبة عدم الحضور من البوابة</span><strong>${applicants.filter((item) => item.source === 'qobool').length ? Math.round((noShows.length / applicants.filter((item) => item.source === 'qobool').length) * 100) : 0}%</strong></div>
         </section>
         ${noShows.length === 0 ? '<div class="empty">لا يوجد مسجلون من البوابة بحالة لم يحضروا المقابلة.</div>' : `
@@ -919,6 +970,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
   const analytics = computeVisualAnalytics(applicants)
+  const sourceSummary = pdfSourceSummary(applicants)
   const charts = [
     pdfBarChart('توزيع حالات الطلبات', analytics.status),
     pdfDonutChart('توزيع النتائج', analytics.results),
@@ -929,6 +981,7 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
 
   const rows = applicants.map((applicant) => {
     const scores = normalizeScores(applicant.scores)
+    const sourceStats = getSourceStats(applicants)
     return `
       <tr>
         <td>${escapeHtml(applicant.requestNo)}</td>
@@ -943,6 +996,9 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         <td>${escapeHtml(scores.responseSpeed)}</td>
         <td>${fullInterviewScore}</td>
         <td>${escapeHtml(calculateScore(applicant))}</td>
+        <td>${sourceStats.portalAttended}</td>
+        <td>${sourceStats.portalNoShows}</td>
+        <td>${sourceStats.directApplicants}</td>
         <td>${escapeHtml(scores.hasAssociatedDifficulty || 'لم يحدد')}</td>
         <td>${escapeHtml(scores.weakHearing || 'لم يحدد')}</td>
         <td>${escapeHtml(scores.knowsSignLanguage || 'لم يحدد')}</td>
@@ -1010,9 +1066,10 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         </section>
         <h2>الرسوم والمؤشرات</h2>
         <section class="pdf-visuals">${charts}</section>
+        ${sourceSummary}
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>الدرجة الكاملة</th><th>المجموع</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
+            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>الدرجة الكاملة</th><th>المجموع</th><th>من البوابة وحضروا</th><th>لم يحضروا</th><th>مباشر</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -1060,9 +1117,8 @@ function App() {
     const pendingDocs = applicants.filter((item) => item.status.includes('مراجعة') || item.status.includes('استكمال')).length
     const interviewed = applicants.filter((item) => item.status === 'تم التقييم' || item.status === 'النتيجة معتمدة').length
     const scheduled = applicants.filter((item) => item.interviewAt).length
-    const portalRegistered = applicants.filter((item) => item.source === 'qobool').length
-    const portalNoShows = getPortalNoShowApplicants(applicants).length
-    return { total: applicants.length, approved, pendingDocs, interviewed, scheduled, portalRegistered, portalNoShows }
+    const sourceStats = getSourceStats(applicants)
+    return { total: applicants.length, approved, pendingDocs, interviewed, scheduled, portalRegistered: sourceStats.portalApplicants, portalAttended: sourceStats.portalAttended, portalNoShows: sourceStats.portalNoShows, directApplicants: sourceStats.directApplicants }
   }, [applicants])
   const activeRole = applicantOnly ? 'applicant' : role
   const selectedManager = collegeManagers[selectedManagerIndex] ?? collegeManagers[0]
@@ -1323,7 +1379,9 @@ function App() {
               <Metric icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} tone="amber" />
               <Metric icon={CalendarDays} label="مواعيد مجدولة" value={stats.scheduled} tone="teal" />
               <Metric icon={CheckCircle2} label="نتائج معتمدة" value={stats.approved} tone="green" />
+              <Metric icon={UserCheck} label="من البوابة وحضروا" value={stats.portalAttended} tone="green" />
               <Metric icon={Clock3} label="من البوابة ولم يحضروا" value={stats.portalNoShows} tone="danger" />
+              <Metric icon={QrCode} label="مسجل مباشر" value={stats.directApplicants} tone="blue" />
             </section>
             <section className="insight-strip" aria-label="ملخص سريع">
               <div>
@@ -1359,6 +1417,8 @@ function App() {
           <HeadView applicants={applicants} selected={selected} setSelectedId={setSelectedId} assignCommittee={assignCommittee} approveResult={approveResult} updateApplicant={updateApplicant} />
         )}
         {role === 'committee' && <CommitteeView applicants={applicants} selected={selected} setSelectedId={setSelectedId} updateApplicant={updateApplicant} submitEvaluation={submitEvaluation} />}
+        {role === 'inquiry' && <ApplicantInquiryView applicants={applicants} selectedId={selected.id} setSelectedId={setSelectedId} />}
+        {role === 'sourceReport' && <SourceReportView applicants={applicants} selectedManager={selectedManager} stats={stats} />}
         {role === 'absent' && <PortalNoShowView applicants={applicants} selectedManager={selectedManager} stats={stats} />}
         {role === 'applicant' && (
           <ApplicantView
@@ -1739,10 +1799,143 @@ function CollegeView({ applicants, stats }: { applicants: Applicant[]; stats: { 
   )
 }
 
+function ApplicantInquiryView({ applicants, selectedId, setSelectedId }: {
+  applicants: Applicant[]
+  selectedId: string
+  setSelectedId: (id: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const normalizedQuery = normalizeDigits(query).trim().toLowerCase()
+  const results = normalizedQuery
+    ? applicants.filter((applicant) => [
+      applicant.name,
+      applicant.nationalId,
+      applicant.requestNo,
+      applicant.waitingNo ?? '',
+      applicant.phone,
+    ].some((value) => normalizeDigits(value).toLowerCase().includes(normalizedQuery)))
+    : []
+  const selectedInquiry = applicants.find((applicant) => applicant.id === selectedId)
+  return (
+    <div className="grid split">
+      <section className="panel">
+        <div className="section-title"><h2>استعلام عن متقدم</h2><Search size={21} /></div>
+        <label className="list-select">
+          البحث بالاسم أو الهوية أو رقم الانتظار
+          <input
+            aria-label="بحث مستقل عن متقدم"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="مثال: رقم الهوية، الاسم، INT-001"
+            value={query}
+          />
+        </label>
+        <ApplicantTable applicants={results} selectedId={selectedId} onSelect={setSelectedId} />
+      </section>
+      <section className="panel">
+        {selectedInquiry ? <Details applicant={selectedInquiry} /> : <p className="report-note">اختر متقدمًا من نتائج البحث لعرض بياناته.</p>}
+      </section>
+    </div>
+  )
+}
+
+function SourceReportView({ applicants, selectedManager, stats }: {
+  applicants: Applicant[]
+  selectedManager: CollegeManager
+  stats: { portalRegistered: number; portalAttended: number; portalNoShows: number; directApplicants: number }
+}) {
+  const sourceRows = [
+    { label: 'المسجلون من البوابة', count: stats.portalRegistered, applicants: applicants.filter((item) => item.source === 'qobool') },
+    { label: 'المسجلون من البوابة وحضروا المقابلة', count: stats.portalAttended, applicants: applicants.filter((item) => item.source === 'qobool' && hasAttendedInterview(item)) },
+    { label: 'الذين لم يحضروا المقابلة', count: stats.portalNoShows, applicants: getPortalNoShowApplicants(applicants) },
+    { label: 'المسجلون بشكل مباشر', count: stats.directApplicants, applicants: applicants.filter((item) => item.source === 'direct') },
+  ]
+  return (
+    <div className="grid two">
+      <section className="panel">
+        <div className="section-title"><h2>تقرير المصدر</h2><BarChart3 size={21} /></div>
+        <div className="metrics compact-metrics">
+          <Metric icon={QrCode} label="من البوابة" value={stats.portalRegistered} tone="blue" />
+          <Metric icon={UserCheck} label="من البوابة وحضروا" value={stats.portalAttended} tone="green" />
+          <Metric icon={Clock3} label="لم يحضروا" value={stats.portalNoShows} tone="danger" />
+          <Metric icon={Users} label="مباشر" value={stats.directApplicants} tone="teal" />
+        </div>
+        <div className="actions">
+          <button onClick={() => exportApplicantsXlsx(applicants, selectedManager, 'source-report')} type="button"><Download size={17} /> XLSX</button>
+          <button onClick={() => exportApplicantsCsv(applicants, selectedManager, 'source-report')} type="button"><Download size={17} /> CSV</button>
+          <button onClick={() => void exportApplicantsPptx(applicants, selectedManager, 'source-report')} type="button"><BarChart3 size={17} /> PPTX</button>
+          <button onClick={() => openSourcePdfReport(applicants, selectedManager)} type="button"><FileText size={17} /> PDF</button>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="section-title"><h2>جدول أعداد المصدر</h2><ListChecks size={21} /></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>المؤشر</th><th>العدد</th><th>أول الأسماء</th></tr>
+            </thead>
+            <tbody>
+              {sourceRows.map((row) => (
+                <tr key={row.label}>
+                  <td data-label="المؤشر">{row.label}</td>
+                  <td data-label="العدد">{row.count}</td>
+                  <td data-label="أول الأسماء">{row.applicants.slice(0, 4).map((item) => item.name).join('، ') || 'لا يوجد'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function openSourcePdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
+  const report = window.open('', '_blank', 'width=1024,height=720')
+  if (!report) return
+  const sourceStats = getSourceStats(applicants)
+  report.document.write(`
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>تقرير المصدر</title>
+        <style>
+          body { margin: 0; padding: 32px; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #182235; }
+          header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
+          h1 { margin: 0 0 8px; font-size: 28px; }
+          p { margin: 0; color: #667085; }
+          table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+          th, td { border: 1px solid #d9e2ec; padding: 10px; text-align: right; font-size: 13px; }
+          th { background: #fafdff; color: #667085; }
+          @media print { body { padding: 18px; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>تقرير المصدر</h1>
+          <p>${escapeHtml(collegeProfile.collegeName)} - ${escapeHtml(collegeProfile.departmentName)}</p>
+          <p>مسؤول إدارة الكلية: ${escapeHtml(formatManager(selectedManager))}</p>
+        </header>
+        <table>
+          <thead><tr><th>المؤشر</th><th>العدد</th></tr></thead>
+          <tbody>
+            <tr><td>المسجلون من البوابة</td><td>${sourceStats.portalApplicants}</td></tr>
+            <tr><td>المسجلون من البوابة وحضروا المقابلة</td><td>${sourceStats.portalAttended}</td></tr>
+            <tr><td>الذين لم يحضروا المقابلة</td><td>${sourceStats.portalNoShows}</td></tr>
+            <tr><td>المسجلون بشكل مباشر</td><td>${sourceStats.directApplicants}</td></tr>
+          </tbody>
+        </table>
+        <script>window.addEventListener('load', () => window.print());</script>
+      </body>
+    </html>
+  `)
+  report.document.close()
+}
+
 function PortalNoShowView({ applicants, selectedManager, stats }: {
   applicants: Applicant[]
   selectedManager: CollegeManager
-  stats: { portalRegistered: number; portalNoShows: number }
+  stats: { portalRegistered: number; portalAttended: number; portalNoShows: number; directApplicants: number }
 }) {
   const noShows = getPortalNoShowApplicants(applicants)
   const noShowPercent = stats.portalRegistered ? Math.round((stats.portalNoShows / stats.portalRegistered) * 100) : 0
@@ -1752,7 +1945,9 @@ function PortalNoShowView({ applicants, selectedManager, stats }: {
         <div className="section-title"><h2>تقرير المسجلين من البوابة ولم يحضروا</h2><Clock3 size={21} /></div>
         <div className="metrics compact-metrics">
           <Metric icon={QrCode} label="إجمالي المسجلين من البوابة" value={stats.portalRegistered} tone="blue" />
+          <Metric icon={UserCheck} label="من البوابة وحضروا" value={stats.portalAttended} tone="green" />
           <Metric icon={Clock3} label="لم يحضروا المقابلة" value={stats.portalNoShows} tone="danger" />
+          <Metric icon={Users} label="مسجل مباشر" value={stats.directApplicants} tone="teal" />
           <Metric icon={BarChart3} label="نسبة عدم الحضور" value={noShowPercent} tone="amber" />
         </div>
         <div className="actions">

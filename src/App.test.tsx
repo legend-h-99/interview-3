@@ -184,6 +184,31 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'متوسطات التقييم' })).toBeTruthy()
   })
 
+  it('supports a separate applicant inquiry page', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'استعلام عن متقدم' }))
+    await user.type(screen.getByLabelText('بحث مستقل عن متقدم'), '1012345678')
+
+    expect(screen.getAllByRole('heading', { name: 'استعلام عن متقدم' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('عبدالله محمد الزهراني').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('مسجل من البوابة').length).toBeGreaterThan(0)
+  })
+
+  it('shows source report counts and distinguishes portal and direct registration', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'تقرير المصدر' }))
+
+    expect(screen.getAllByRole('heading', { name: 'تقرير المصدر' }).length).toBeGreaterThan(0)
+    expect(screen.getByText('المسجلون من البوابة وحضروا المقابلة')).toBeTruthy()
+    expect(screen.getByText('الذين لم يحضروا المقابلة')).toBeTruthy()
+    expect(screen.getByText('المسجلون بشكل مباشر')).toBeTruthy()
+    expect(screen.getByText('مباشر')).toBeTruthy()
+  })
+
   it('computes visual analytics distributions and score averages', () => {
     const analytics = computeVisualAnalytics(seedApplicants)
 
@@ -236,6 +261,9 @@ describe('Interview management system', () => {
     expect(csv).toContain('30487')
     expect(csv).toContain('الدرجة الكاملة')
     expect(csv).toContain('المجموع')
+    expect(csv).toContain('عدد المسجلين من البوابة وحضروا المقابلة')
+    expect(csv).toContain('عدد الذين لم يحضروا المقابلة')
+    expect(csv).toContain('عدد المسجلين بشكل مباشر')
     expect(csv).toContain(',"50",')
     expect(clickSpy).toHaveBeenCalled()
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:interview-3-export')
@@ -299,6 +327,9 @@ describe('Interview management system', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('متوسطات التقييم'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('الدرجة الكاملة'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('المجموع'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير المصدر والحضور'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('المسجلون من البوابة وحضروا المقابلة'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('المسجلون بشكل مباشر'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('الكلية التقنية للاتصالات والمعلومات'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('قسم التقنية الخاصة للصم وضعاف السمع'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('وكيل التدريب: أحمد الطلحي'))
