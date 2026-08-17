@@ -246,7 +246,7 @@ describe('Interview management system', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('قسم التقنية الخاصة للصم وضعاف السمع'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('وكيل التدريب: أحمد الطلحي'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('محمد الرميح'))
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('حسام الدين عثمان مسملي'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('موسى عبدالرحيم الأنصاري'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('المنصة الإلكترونية للفرز'))
     expect(write).toHaveBeenCalledWith(expect.stringContaining('عبدالله محمد الزهراني'))
     expect(close).toHaveBeenCalled()

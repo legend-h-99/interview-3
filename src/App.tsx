@@ -170,7 +170,6 @@ const roleDescriptions: Record<Role, string> = {
 const staffMembers: StaffMember[] = [
   { id: 's1', name: 'رائد الغفيلي', computerNo: '30487', task: 'رئيس القسم / رئيس اللجنة' },
   { id: 's2', name: 'موسى عبدالرحيم الأنصاري', computerNo: '30004', task: 'المنصة الإلكترونية للفرز' },
-  { id: 's3', name: 'حسام الدين عثمان مسملي', computerNo: '28996', task: 'المنصة الإلكترونية للفرز' },
   { id: 's4', name: 'سالم سعيد الشمري', computerNo: '27548', task: 'لجنة 1' },
   { id: 's5', name: 'دهام مخلف الشمري', computerNo: '23294', task: 'لجنة 1' },
   { id: 's6', name: 'خالد عبدالعزيز المديفر', computerNo: '31067', task: 'لجنة 2' },
