@@ -209,6 +209,57 @@ describe('Interview management system', () => {
     expect(screen.getByText('مباشر')).toBeTruthy()
   })
 
+  it('shows a separate Qobooli-only matched report and exports it', async () => {
+    const user = userEvent.setup()
+    const createObjectUrl = vi.fn(() => 'blob:qobooli-report')
+    const revokeObjectUrl = vi.fn()
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'تقرير منصة قبولي' }))
+
+    expect(screen.getAllByRole('heading', { name: 'تقرير منصة قبولي' }).length).toBeGreaterThan(0)
+    expect(screen.getByText('تقرير مستقل يعرض سجلات مصدر منصة قبولي فقط، ويطابق الاسم ورقم الهوية مع بيانات النظام.')).toBeTruthy()
+    expect(screen.getAllByText('عماش عبدالرحمن بن عماش').length).toBeGreaterThan(0)
+    expect(screen.getByText('1122595406')).toBeTruthy()
+    expect(screen.getAllByText('منصة قبولي').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('مطابق بالهوية والاسم').length).toBeGreaterThan(0)
+
+    await user.click(screen.getAllByRole('button', { name: 'CSV' }).at(-1) as HTMLElement)
+
+    const blob = createObjectUrl.mock.calls.at(0)?.at(0) as unknown as Blob
+    const csv = await blob.text()
+    expect(csv).toContain('تقرير منصة قبولي')
+    expect(csv).toContain('حالة المطابقة')
+    expect(csv).toContain('عماش عبدالرحمن بن عماش')
+    expect(csv).toContain('1122595406')
+    expect(csv).toContain('منصة قبولي')
+    expect(clickSpy).toHaveBeenCalled()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:qobooli-report')
+  })
+
+  it('opens a printable Qobooli PDF report', async () => {
+    const user = userEvent.setup()
+    const write = vi.fn()
+    const close = vi.fn()
+    vi.spyOn(window, 'open').mockReturnValue({
+      document: { write, close },
+    } as unknown as Window)
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'تقرير منصة قبولي' }))
+    await user.click(screen.getAllByRole('button', { name: 'PDF' }).at(-1) as HTMLElement)
+
+    expect(window.open).toHaveBeenCalled()
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير منصة قبولي'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('مطابق بالهوية والاسم'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('عماش عبدالرحمن بن عماش'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('منصة قبولي'))
+    expect(close).toHaveBeenCalled()
+  })
+
   it('computes visual analytics distributions and score averages', () => {
     const analytics = computeVisualAnalytics(seedApplicants)
 

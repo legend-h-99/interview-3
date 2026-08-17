@@ -24,7 +24,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
 
-type Role = 'college' | 'trainees' | 'head' | 'committee' | 'inquiry' | 'sourceReport' | 'absent' | 'applicant'
+type Role = 'college' | 'trainees' | 'head' | 'committee' | 'inquiry' | 'sourceReport' | 'qobooliReport' | 'absent' | 'applicant'
 type Source = 'qobool' | 'direct'
 type Status =
   | 'غير محدد'
@@ -159,6 +159,7 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'committee', label: 'لجان المقابلات', icon: UserCheck },
   { id: 'inquiry', label: 'استعلام عن متقدم', icon: Search },
   { id: 'sourceReport', label: 'تقرير المصدر', icon: BarChart3 },
+  { id: 'qobooliReport', label: 'تقرير منصة قبولي', icon: FileText },
   { id: 'absent', label: 'لم يحضروا المقابلة', icon: Clock3 },
   { id: 'applicant', label: 'واجهة المتقدم', icon: QrCode },
 ]
@@ -171,6 +172,7 @@ const roleDescriptions: Record<Role, string> = {
   committee: 'إدارة جلسات المقابلة وتسجيل الدرجات والملاحظات.',
   inquiry: 'استعلام مستقل عن بيانات متقدم بالاسم أو الهوية أو رقم الانتظار.',
   sourceReport: 'تقرير منفصل يوضح مصدر التسجيل وحضور المقابلة.',
+  qobooliReport: 'تقرير مستقل لسجلات منصة قبولي فقط مع مطابقة الاسم ورقم الهوية.',
   absent: 'تقرير خاص بالمسجلين من البوابة ولم يحضروا المقابلة.',
   applicant: 'تسجيل طلب جديد أو متابعة حالة الطلب برقم الهوية.',
 }
@@ -392,6 +394,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
 const fullInterviewScore = 50
 const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'عدد المسجلين من البوابة وحضروا المقابلة', 'عدد الذين لم يحضروا المقابلة', 'عدد المسجلين بشكل مباشر', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const qobooliReportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الهوية', 'الاسم في منصة قبولي', 'الاسم في النظام', 'حالة المطابقة', 'رقم الجوال', 'المنشأة', 'التخصص', 'البرنامج', 'رقم الرغبة', 'حالة القبول', 'الحالة في النظام', 'رقم الانتظار', 'الدرجة الكاملة', 'المجموع', 'المصدر']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 let fallbackSessionId = ''
 
@@ -483,6 +486,14 @@ function registrationSourceLabel(source: Source) {
   return source === 'qobool' ? 'مسجل من البوابة' : 'مسجل بشكل مباشر'
 }
 
+function normalizeMatchText(value: string) {
+  return normalizeDigits(value).replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function qobooliSourceLabel() {
+  return 'منصة قبولي'
+}
+
 function getPortalNoShowApplicants(applicants: Applicant[]) {
   return applicants.filter((applicant) => applicant.source === 'qobool' && applicant.status === noShowStatus)
 }
@@ -502,6 +513,50 @@ function getSourceStats(applicants: Applicant[]) {
     portalNoShows,
     directApplicants,
   }
+}
+
+function buildQobooliMatches(applicants: Applicant[]) {
+  return acceptedApplicants.map((accepted) => {
+    const systemApplicant = applicants.find((applicant) => applicant.nationalId === accepted.nationalId)
+    const nameMatches = systemApplicant ? normalizeMatchText(systemApplicant.name) === normalizeMatchText(accepted.name) : false
+    const matchStatus = !systemApplicant ? 'غير موجود في النظام' : nameMatches ? 'مطابق بالهوية والاسم' : 'مطابق بالهوية مع اختلاف الاسم'
+    return { accepted, systemApplicant, matchStatus }
+  })
+}
+
+function getQobooliReportStats(applicants: Applicant[]) {
+  const matches = buildQobooliMatches(applicants)
+  const exactMatches = matches.filter((item) => item.matchStatus === 'مطابق بالهوية والاسم').length
+  const idOnlyMatches = matches.filter((item) => item.matchStatus === 'مطابق بالهوية مع اختلاف الاسم').length
+  const missing = matches.filter((item) => item.matchStatus === 'غير موجود في النظام').length
+  const attended = matches.filter((item) => item.systemApplicant && hasAttendedInterview(item.systemApplicant)).length
+  const noShows = matches.filter((item) => item.systemApplicant?.status === noShowStatus).length
+  return { total: acceptedApplicants.length, exactMatches, idOnlyMatches, missing, attended, noShows }
+}
+
+function buildQobooliReportRows(applicants: Applicant[], selectedManager: CollegeManager) {
+  return buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus }) => [
+    collegeProfile.collegeName,
+    collegeProfile.departmentName,
+    collegeProfile.departmentHeadAndCommitteeChair,
+    formatManager(selectedManager),
+    collegeProfile.traineeAffairsDeputy,
+    accepted.nationalId,
+    accepted.name,
+    systemApplicant?.name ?? '',
+    matchStatus,
+    normalizeImportedPhone(accepted.phone),
+    accepted.organization,
+    accepted.major,
+    accepted.program,
+    accepted.preferenceNo,
+    accepted.admissionStatus,
+    systemApplicant?.status ?? 'غير موجود',
+    systemApplicant?.waitingNo ?? '',
+    fullInterviewScore,
+    systemApplicant ? calculateScore(systemApplicant) : '',
+    qobooliSourceLabel(),
+  ])
 }
 
 function applicantToForm(applicant: Applicant): ApplicantForm {
@@ -697,6 +752,46 @@ function exportPortalNoShowXlsx(applicants: Applicant[], selectedManager: Colleg
 
 function exportPortalNoShowPptx(applicants: Applicant[], selectedManager: CollegeManager) {
   return exportApplicantsPptx(getPortalNoShowApplicants(applicants), selectedManager, 'portal-no-shows')
+}
+
+function exportQobooliCsv(applicants: Applicant[], selectedManager: CollegeManager) {
+  const rows = buildQobooliReportRows(applicants, selectedManager)
+  const csv = [
+    'تقرير منصة قبولي',
+    [qobooliReportHeaders, ...rows].map((row) => row.map(csvCell).join(',')).join('\n'),
+  ].join('\n')
+  downloadBlob(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }), reportFileName('qobooli-report', 'csv'))
+}
+
+function exportQobooliXlsx(applicants: Applicant[], selectedManager: CollegeManager) {
+  const rows = buildQobooliReportRows(applicants, selectedManager)
+  downloadBlob(
+    buildXlsxBlob([{ name: 'تقرير منصة قبولي', rows: [qobooliReportHeaders, ...rows] }]),
+    reportFileName('qobooli-report', 'xlsx'),
+  )
+}
+
+function exportQobooliPptx(applicants: Applicant[], selectedManager: CollegeManager) {
+  const stats = getQobooliReportStats(applicants)
+  const sampleLines = buildQobooliMatches(applicants).slice(0, 10).map((item, index) => `${index + 1}. ${item.accepted.name} - ${item.accepted.nationalId} - ${item.matchStatus}`)
+  const metricLines = [
+    `إجمالي سجلات منصة قبولي: ${stats.total}`,
+    `مطابق بالهوية والاسم: ${stats.exactMatches}`,
+    `مطابق بالهوية مع اختلاف الاسم: ${stats.idOnlyMatches}`,
+    `غير موجود في النظام: ${stats.missing}`,
+    `حضروا المقابلة: ${stats.attended}`,
+    `لم يحضروا المقابلة: ${stats.noShows}`,
+  ]
+  downloadBlob(
+    buildPptxBlob([
+      { text: 'تقرير منصة قبولي', x: 500000, y: 300000, w: 11300000, h: 500000, size: 2600, bold: true, color: '182235' },
+      { text: `${collegeProfile.collegeName} - ${collegeProfile.departmentName}`, x: 500000, y: 850000, w: 11300000, h: 320000, size: 1300, color: '475569' },
+      { text: metricLines.join('\n'), x: 6900000, y: 1500000, w: 5200000, h: 2200000, size: 1450, bold: true, color: '0F6B8F', fill: 'FFFFFF' },
+      { text: `أول سجلات المطابقة\n${sampleLines.join('\n')}`, x: 700000, y: 1500000, w: 5600000, h: 4400000, size: 1200, color: '182235', fill: 'FFFFFF' },
+      { text: `مسؤول إدارة الكلية: ${formatManager(selectedManager)} | المصدر: ${qobooliSourceLabel()}`, x: 700000, y: 6600000, w: 11300000, h: 320000, size: 1000, color: '64748B' },
+    ]),
+    reportFileName('qobooli-report', 'pptx'),
+  )
 }
 
 function escapeHtml(value: string | number | undefined) {
@@ -1419,6 +1514,7 @@ function App() {
         {role === 'committee' && <CommitteeView applicants={applicants} selected={selected} setSelectedId={setSelectedId} updateApplicant={updateApplicant} submitEvaluation={submitEvaluation} />}
         {role === 'inquiry' && <ApplicantInquiryView applicants={applicants} selectedId={selected.id} setSelectedId={setSelectedId} />}
         {role === 'sourceReport' && <SourceReportView applicants={applicants} selectedManager={selectedManager} stats={stats} />}
+        {role === 'qobooliReport' && <QobooliReportView applicants={applicants} selectedManager={selectedManager} />}
         {role === 'absent' && <PortalNoShowView applicants={applicants} selectedManager={selectedManager} stats={stats} />}
         {role === 'applicant' && (
           <ApplicantView
@@ -1889,6 +1985,59 @@ function SourceReportView({ applicants, selectedManager, stats }: {
   )
 }
 
+function QobooliReportView({ applicants, selectedManager }: {
+  applicants: Applicant[]
+  selectedManager: CollegeManager
+}) {
+  const matches = buildQobooliMatches(applicants)
+  const stats = getQobooliReportStats(applicants)
+  return (
+    <div className="grid two">
+      <section className="panel">
+        <div className="section-title"><h2>تقرير منصة قبولي</h2><FileText size={21} /></div>
+        <p className="report-note">تقرير مستقل يعرض سجلات مصدر منصة قبولي فقط، ويطابق الاسم ورقم الهوية مع بيانات النظام.</p>
+        <div className="metrics compact-metrics">
+          <Metric icon={QrCode} label="سجلات قبولي" value={stats.total} tone="blue" />
+          <Metric icon={CheckCircle2} label="مطابق بالاسم والهوية" value={stats.exactMatches} tone="green" />
+          <Metric icon={Search} label="اختلاف اسم" value={stats.idOnlyMatches} tone="amber" />
+          <Metric icon={Clock3} label="غير موجود" value={stats.missing} tone="danger" />
+          <Metric icon={UserCheck} label="حضروا المقابلة" value={stats.attended} tone="teal" />
+          <Metric icon={Clock3} label="لم يحضروا" value={stats.noShows} tone="danger" />
+        </div>
+        <div className="actions">
+          <button onClick={() => exportQobooliXlsx(applicants, selectedManager)} type="button"><Download size={17} /> XLSX</button>
+          <button onClick={() => exportQobooliCsv(applicants, selectedManager)} type="button"><Download size={17} /> CSV</button>
+          <button onClick={() => exportQobooliPptx(applicants, selectedManager)} type="button"><BarChart3 size={17} /> PPTX</button>
+          <button onClick={() => openQobooliPdfReport(applicants, selectedManager)} type="button"><FileText size={17} /> PDF</button>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="section-title"><h2>مطابقة بيانات قبولي</h2><ListChecks size={21} /></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>رقم الهوية</th><th>الاسم في قبولي</th><th>الاسم في النظام</th><th>حالة المطابقة</th><th>حالة النظام</th><th>رقم الانتظار</th><th>المصدر</th></tr>
+            </thead>
+            <tbody>
+              {matches.map(({ accepted, systemApplicant, matchStatus }) => (
+                <tr key={accepted.nationalId}>
+                  <td data-label="رقم الهوية">{accepted.nationalId}</td>
+                  <td data-label="الاسم في قبولي">{accepted.name}</td>
+                  <td data-label="الاسم في النظام">{systemApplicant?.name ?? 'غير موجود'}</td>
+                  <td data-label="حالة المطابقة"><span className={`status ${matchStatus === 'مطابق بالهوية والاسم' ? 'success' : matchStatus === 'غير موجود في النظام' ? 'danger' : 'warning'}`}>{matchStatus}</span></td>
+                  <td data-label="حالة النظام">{systemApplicant?.status ?? 'غير موجود'}</td>
+                  <td data-label="رقم الانتظار">{systemApplicant?.waitingNo ?? 'لم يصدر'}</td>
+                  <td data-label="المصدر">{qobooliSourceLabel()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function openSourcePdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
@@ -1924,6 +2073,86 @@ function openSourcePdfReport(applicants: Applicant[], selectedManager: CollegeMa
             <tr><td>الذين لم يحضروا المقابلة</td><td>${sourceStats.portalNoShows}</td></tr>
             <tr><td>المسجلون بشكل مباشر</td><td>${sourceStats.directApplicants}</td></tr>
           </tbody>
+        </table>
+        <script>window.addEventListener('load', () => window.print());</script>
+      </body>
+    </html>
+  `)
+  report.document.close()
+}
+
+function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
+  const report = window.open('', '_blank', 'width=1024,height=720')
+  if (!report) return
+  const stats = getQobooliReportStats(applicants)
+  const rows = buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus }, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(accepted.nationalId)}</td>
+      <td>${escapeHtml(accepted.name)}</td>
+      <td>${escapeHtml(systemApplicant?.name ?? 'غير موجود')}</td>
+      <td>${escapeHtml(matchStatus)}</td>
+      <td>${escapeHtml(normalizeImportedPhone(accepted.phone))}</td>
+      <td>${escapeHtml(accepted.organization)}</td>
+      <td>${escapeHtml(accepted.major)}</td>
+      <td>${escapeHtml(accepted.program)}</td>
+      <td>${escapeHtml(accepted.preferenceNo)}</td>
+      <td>${escapeHtml(accepted.admissionStatus)}</td>
+      <td>${escapeHtml(systemApplicant?.status ?? 'غير موجود')}</td>
+      <td>${escapeHtml(systemApplicant?.waitingNo ?? 'لم يصدر')}</td>
+      <td>${fullInterviewScore}</td>
+      <td>${systemApplicant ? escapeHtml(calculateScore(systemApplicant)) : ''}</td>
+      <td>${escapeHtml(qobooliSourceLabel())}</td>
+    </tr>
+  `).join('')
+  report.document.write(`
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>تقرير منصة قبولي</title>
+        <style>
+          body { margin: 0; padding: 32px; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #182235; }
+          header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
+          h1 { margin: 0 0 8px; font-size: 28px; }
+          p { margin: 0; color: #667085; }
+          .identity, .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+          .identity div, .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; background: #fafdff; }
+          span { display: block; color: #667085; font-size: 12px; }
+          strong { display: block; margin-top: 5px; font-size: 16px; }
+          .metric strong { font-size: 28px; color: #0f6b8f; }
+          table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+          th, td { border: 1px solid #d9e2ec; padding: 9px; text-align: right; font-size: 12px; }
+          th { background: #fafdff; color: #667085; }
+          @media print { body { padding: 18px; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>تقرير منصة قبولي</h1>
+          <p>تقرير مستقل لمطابقة الاسم ورقم الهوية - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
+        </header>
+        <section class="identity">
+          <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
+          <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
+          <div><span>رئيس القسم / رئيس اللجنة</span><strong>${escapeHtml(collegeProfile.departmentHeadAndCommitteeChair)}</strong></div>
+          <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
+          <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
+          <div><span>المصدر</span><strong>${escapeHtml(qobooliSourceLabel())}</strong></div>
+        </section>
+        <section class="metrics">
+          <div class="metric"><span>إجمالي سجلات قبولي</span><strong>${stats.total}</strong></div>
+          <div class="metric"><span>مطابق بالهوية والاسم</span><strong>${stats.exactMatches}</strong></div>
+          <div class="metric"><span>مطابق بالهوية مع اختلاف الاسم</span><strong>${stats.idOnlyMatches}</strong></div>
+          <div class="metric"><span>غير موجود في النظام</span><strong>${stats.missing}</strong></div>
+          <div class="metric"><span>حضروا المقابلة</span><strong>${stats.attended}</strong></div>
+          <div class="metric"><span>لم يحضروا المقابلة</span><strong>${stats.noShows}</strong></div>
+        </section>
+        <table>
+          <thead>
+            <tr><th>#</th><th>رقم الهوية</th><th>الاسم في قبولي</th><th>الاسم في النظام</th><th>حالة المطابقة</th><th>رقم الجوال</th><th>المنشأة</th><th>التخصص</th><th>البرنامج</th><th>رقم الرغبة</th><th>حالة القبول</th><th>حالة النظام</th><th>رقم الانتظار</th><th>الدرجة الكاملة</th><th>المجموع</th><th>المصدر</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
         </table>
         <script>window.addEventListener('load', () => window.print());</script>
       </body>
