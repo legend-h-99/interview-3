@@ -533,31 +533,6 @@ async function resetApplicants(env) {
   return json({ applicants: seedApplicants });
 }
 
-async function cleanupRequestedApplicants(env) {
-  const db = await ensureDb(env);
-  const where = \`(
-    name LIKE '%متقدم اختبار%' OR
-    name LIKE '%اختبار API%' OR
-    name LIKE '%متقدم شبكة%' OR
-    name LIKE '%متقدم حر%' OR
-    name LIKE '%متقدم تحقق%' OR
-    name LIKE '%متقدم نهائي%' OR
-    name LIKE '%متقدم تجريبي%' OR
-    name LIKE '%اختباري%' OR
-    name LIKE '%تجريبي%' OR
-    name LIKE '%حسام عبدالله%' OR
-    name LIKE '%حسام المسملي%' OR
-    name LIKE '%حسام الدين عثمان مسملي%' OR
-    name LIKE '%موسى 111%' OR
-    name LIKE '%موسى ١١١%' OR
-    national_id LIKE 'ID-تجربة-%' OR
-    national_id LIKE 'ID-نهائي-%'
-  )\`;
-  const before = await db.prepare(\`SELECT id, name, national_id, request_no, waiting_no FROM applicants WHERE \${where} ORDER BY created_at DESC\`).all();
-  await db.prepare(\`DELETE FROM applicants WHERE \${where}\`).run();
-  return json({ deleted: before.results });
-}
-
 async function handleApi(request, env) {
   try {
     const url = new URL(request.url);
@@ -572,7 +547,6 @@ async function handleApi(request, env) {
     const match = url.pathname.match(/^\\/api\\/applicants\\/([^/]+)$/);
     if (!response && match && request.method === 'PATCH') response = await updateApplicant(env, request, match[1]);
     if (!response && url.pathname === '/api/reset' && request.method === 'POST') response = await resetApplicants(env);
-    if (!response && url.pathname === '/api/cleanup-requested-applicants' && request.method === 'POST') response = await cleanupRequestedApplicants(env);
     return withCors(response || json({ error: 'Not found' }, { status: 404 }), request);
   } catch (error) {
     return withCors(json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 }), request);

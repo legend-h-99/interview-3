@@ -303,8 +303,8 @@ describe('Interview management system', () => {
     window.history.pushState({}, '', '/?view=applicant')
     render(<App />)
 
-    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), 'ID-تجربة-١٢٣')
-    expect((screen.getByLabelText('رقم الهوية') as HTMLInputElement).value).toBe('ID-تجربة-123')
+    await user.type(screen.getByLabelText('رقم الهوية الوطنية أو الاسم'), 'ID-ABC-١٢٣')
+    expect((screen.getByLabelText('رقم الهوية') as HTMLInputElement).value).toBe('ID-ABC-123')
   })
 
   it('prevents duplicate applicant registration by national ID', async () => {
