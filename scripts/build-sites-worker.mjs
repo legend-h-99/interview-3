@@ -514,20 +514,6 @@ async function resetApplicants(env) {
   return json({ applicants: seedApplicants });
 }
 
-async function clearApplicantAssessments(env) {
-  const db = await ensureDb(env);
-  await db.prepare(\`UPDATE applicants SET
-    status = ?,
-    documents_json = ?,
-    scores_json = ?,
-    notes = '',
-    final_result = NULL,
-    audit_json = ?,
-    updated_at = CURRENT_TIMESTAMP
-  \`).bind(neutralStatus, '[]', '{}', '[]').run();
-  return listApplicants(env);
-}
-
 async function handleApi(request, env) {
   try {
     const url = new URL(request.url);
@@ -542,7 +528,6 @@ async function handleApi(request, env) {
     const match = url.pathname.match(/^\\/api\\/applicants\\/([^/]+)$/);
     if (!response && match && request.method === 'PATCH') response = await updateApplicant(env, request, match[1]);
     if (!response && url.pathname === '/api/reset' && request.method === 'POST') response = await resetApplicants(env);
-    if (!response && url.pathname === '/api/clear-applicant-assessments' && request.method === 'POST') response = await clearApplicantAssessments(env);
     return withCors(response || json({ error: 'Not found' }, { status: 404 }), request);
   } catch (error) {
     return withCors(json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 }), request);
