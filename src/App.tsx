@@ -1594,6 +1594,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   })
   const [reviewReady, setReviewReady] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
+  const [saveNotice, setSaveNotice] = useState<{ kind: 'pending' | 'success' | 'error'; message: string } | null>(null)
   const selectedStaff = selectedStaffIds
     .map((id) => staffMembers.find((member) => member.id === id))
     .filter((member): member is StaffMember => Boolean(member))
@@ -1647,6 +1648,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   const setScore = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'signLanguage' | 'appearance' | 'responseSpeed'>, value: number) => {
     setReviewReady(false)
     setValidationMessage('')
+    setSaveNotice(null)
     updateApplicant(activeApplicant.id, { scores: { ...selectedScores, [key]: value }, status: 'المقابلة جارية' }, 'حفظ تقييم مؤقت')
   }
 
@@ -1654,12 +1656,14 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     setNotesDraft(value)
     setReviewReady(false)
     setValidationMessage('')
+    setSaveNotice(null)
     updateApplicant(activeApplicant.id, { notes: value }, 'تحديث ملاحظات المقابلة')
   }
 
   const setQuestionScore = (index: number, rawValue: string) => {
     setReviewReady(false)
     setValidationMessage('')
+    setSaveNotice(null)
     const nextDrafts = [...questionScoreDrafts]
     nextDrafts[index] = rawValue
     setQuestionScoreDrafts(nextDrafts)
@@ -1678,6 +1682,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     setYesNoDrafts(nextDrafts)
     setReviewReady(false)
     setValidationMessage('')
+    setSaveNotice(null)
     updateApplicant(activeApplicant.id, { scores: { ...selectedScores, ...nextDrafts }, status: 'المقابلة جارية' }, 'حفظ بيانات ملاحظة المقابلة')
   }
 
@@ -1698,6 +1703,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
       return
     }
     setValidationMessage('')
+    setSaveNotice({ kind: 'pending', message: 'تم الانتقال للمتقدم التالي، وجارٍ حفظ التقييم النهائي...' })
     const finalScores = {
       ...selectedScores,
       ...yesNoDrafts,
@@ -1707,9 +1713,13 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
     const nextApplicant =
       applicants.find((applicant) => applicant.id !== activeApplicant.id && applicant.status !== 'النتيجة معتمدة') ??
       applicants.find((applicant) => applicant.id !== activeApplicant.id)
-    void submitEvaluation(activeApplicant.id, { scores: finalScores, notes: notesDraft }).catch(() => {
-      setValidationMessage('تم الانتقال، لكن تعذر حفظ التقييم النهائي. تحقق من الاتصال وأعد المحاولة عند الحاجة.')
-    })
+    void submitEvaluation(activeApplicant.id, { scores: finalScores, notes: notesDraft })
+      .then(() => {
+        setSaveNotice({ kind: 'success', message: 'تم حفظ التقييم النهائي بنجاح.' })
+      })
+      .catch(() => {
+        setSaveNotice({ kind: 'error', message: 'تم الانتقال، لكن تعذر حفظ التقييم النهائي. تحقق من الاتصال وأعد المحاولة عند الحاجة.' })
+      })
     if (nextApplicant) {
       setSelectedId(nextApplicant.id)
     }
@@ -1830,6 +1840,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             <small>{activeApplicant.finalResult ? `تم اعتماد المدرب: ${activeApplicant.finalResult}` : `تم تسجيل ${questionProgress} من ${selectedQuestions.length} درجات أسئلة`}</small>
             {reviewReady && <b className="review-confirm">الدرجة جاهزة للمراجعة: {selectedTotalScore} من 50</b>}
             {validationMessage && <em className="validation-message">{validationMessage}</em>}
+            {saveNotice && <em className={`save-notice ${saveNotice.kind}`}>{saveNotice.message}</em>}
           </div>
           <ScoreInput label="الإشارة" max={25} value={selectedScores.signLanguage} onChange={(value) => setScore('signLanguage', value)} />
           <ScoreInput label="المظهر العام" max={5} value={selectedScores.appearance} onChange={(value) => setScore('appearance', value)} />

@@ -411,6 +411,7 @@ describe('Interview management system', () => {
     await user.click(screen.getByRole('button', { name: /تأكيد الاعتماد والانتقال للمتقدم التالي/ }))
 
     expect(screen.queryByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' })).toBeNull()
+    expect(await screen.findByText('تم حفظ التقييم النهائي بنجاح.')).toBeTruthy()
     await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'رئيس القسم' }))
     await user.click(screen.getAllByText('عبدالله محمد الزهراني')[0])
     const detailsPanel = screen.getByRole('heading', { level: 2, name: 'عبدالله محمد الزهراني' }).closest('.panel')
@@ -449,6 +450,7 @@ describe('Interview management system', () => {
     await user.click(screen.getByRole('button', { name: /تأكيد الاعتماد والانتقال للمتقدم التالي/ }))
 
     expect(screen.getByLabelText('المتقدم المختار للمقابلة').textContent).not.toContain('عبدالله محمد الزهراني')
+    expect(screen.getByText('تم الانتقال للمتقدم التالي، وجارٍ حفظ التقييم النهائي...')).toBeTruthy()
   })
 
   it('blocks interview approval until question scores are complete', async () => {

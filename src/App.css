@@ -985,7 +985,8 @@ tbody tr.selected {
 }
 
 .review-confirm,
-.validation-message {
+.validation-message,
+.save-notice {
   display: block;
   width: fit-content;
   max-width: 100%;
@@ -1004,6 +1005,21 @@ tbody tr.selected {
 .validation-message {
   color: #92400e;
   background: #fef3c7;
+}
+
+.save-notice.pending {
+  color: #075985;
+  background: #e0f2fe;
+}
+
+.save-notice.success {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.save-notice.error {
+  color: #991b1b;
+  background: #fee2e2;
 }
 
 .progress {
