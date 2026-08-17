@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
 
-type Role = 'college' | 'trainees' | 'head' | 'committee' | 'applicant'
+type Role = 'college' | 'trainees' | 'head' | 'committee' | 'absent' | 'applicant'
 type Source = 'qobool' | 'direct'
 type Status =
   | 'غير محدد'
@@ -156,6 +156,7 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'trainees', label: 'شؤون المتدربين', icon: ClipboardCheck },
   { id: 'head', label: 'رئيس القسم', icon: GraduationCap },
   { id: 'committee', label: 'لجان المقابلات', icon: UserCheck },
+  { id: 'absent', label: 'لم يحضروا المقابلة', icon: Clock3 },
   { id: 'applicant', label: 'واجهة المتقدم', icon: QrCode },
 ]
 const roleIds = roles.map((item) => item.id)
@@ -165,6 +166,7 @@ const roleDescriptions: Record<Role, string> = {
   trainees: 'مراجعة الطلبات والوثائق وإصدار أرقام الانتظار للمتقدمين.',
   head: 'توزيع المتقدمين على اللجان واعتماد النتائج النهائية.',
   committee: 'إدارة جلسات المقابلة وتسجيل الدرجات والملاحظات.',
+  absent: 'تقرير خاص بالمسجلين من البوابة ولم يحضروا المقابلة.',
   applicant: 'تسجيل طلب جديد أو متابعة حالة الطلب برقم الهوية.',
 }
 
@@ -379,6 +381,7 @@ const emptyApplicantForm: ApplicantForm = {
 
 const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
 const maxConcurrentUsers = 150
+const noShowStatus: Status = 'معتذر أو لم يحضر'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
@@ -457,6 +460,10 @@ function registrationSourceLabel(source: Source) {
   return source === 'qobool' ? 'مسجل من البوابة' : 'مسجل بشكل مباشر'
 }
 
+function getPortalNoShowApplicants(applicants: Applicant[]) {
+  return applicants.filter((applicant) => applicant.source === 'qobool' && applicant.status === noShowStatus)
+}
+
 function applicantToForm(applicant: Applicant): ApplicantForm {
   return {
     nationalId: applicant.nationalId,
@@ -506,7 +513,7 @@ function normalizeScores(scores: InterviewScores = {}) {
   }
 }
 
-function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager) {
+function exportApplicantsExcel(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
   const rows = applicants.map((applicant) => {
     const scores = normalizeScores(applicant.scores)
     return [
@@ -557,11 +564,15 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.download = `interview-3-applicants-${new Date().toISOString().slice(0, 10)}.csv`
+  link.download = `interview-3-${fileLabel}-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.append(link)
   link.click()
   link.remove()
   URL.revokeObjectURL(link.href)
+}
+
+function exportPortalNoShowExcel(applicants: Applicant[], selectedManager: CollegeManager) {
+  exportApplicantsExcel(getPortalNoShowApplicants(applicants), selectedManager, 'portal-no-shows')
 }
 
 function escapeHtml(value: string | number | undefined) {
@@ -641,6 +652,78 @@ function pdfYesNoSummary(items: ReturnType<typeof computeVisualAnalytics>['yesNo
       }).join('')}
     </article>
   `
+}
+
+function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
+  const noShows = getPortalNoShowApplicants(applicants)
+  const report = window.open('', '_blank', 'width=1024,height=720')
+  if (!report) return
+  const rows = noShows.map((applicant, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(applicant.name)}</td>
+      <td>${escapeHtml(applicant.nationalId)}</td>
+      <td>${escapeHtml(applicant.phone)}</td>
+      <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
+      <td>${escapeHtml(applicant.interviewAt ?? 'غير مجدول')}</td>
+      <td>${escapeHtml(applicant.program ?? applicant.certificateType)}</td>
+      <td>${escapeHtml(applicant.status)}</td>
+    </tr>
+  `).join('')
+  report.document.write(`
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>تقرير المسجلين من البوابة ولم يحضروا</title>
+        <style>
+          body { margin: 0; padding: 32px; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #182235; }
+          header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
+          h1 { margin: 0 0 8px; font-size: 28px; }
+          p { margin: 0; color: #667085; }
+          .identity, .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+          .identity div, .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; background: #fafdff; }
+          span { display: block; color: #667085; font-size: 12px; }
+          strong { display: block; margin-top: 5px; font-size: 16px; }
+          .metric strong { font-size: 28px; color: #991b1b; }
+          table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+          th, td { border: 1px solid #d9e2ec; padding: 10px; text-align: right; font-size: 13px; }
+          th { background: #fafdff; color: #667085; }
+          .empty { padding: 18px; border: 1px solid #d9e2ec; border-radius: 8px; color: #667085; background: #fafdff; }
+          @media print { body { padding: 18px; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>تقرير المسجلين من البوابة ولم يحضروا المقابلة</h1>
+          <p>interview 3 - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
+        </header>
+        <section class="identity">
+          <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
+          <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
+          <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
+          <div><span>رئيس القسم / رئيس اللجنة</span><strong>${escapeHtml(collegeProfile.departmentHeadAndCommitteeChair)}</strong></div>
+          <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
+          <div><span>معيار التقرير</span><strong>المصدر: مسجل من البوابة، الحالة: ${escapeHtml(noShowStatus)}</strong></div>
+        </section>
+        <section class="metrics">
+          <div class="metric"><span>إجمالي المسجلين من البوابة</span><strong>${applicants.filter((item) => item.source === 'qobool').length}</strong></div>
+          <div class="metric"><span>لم يحضروا المقابلة</span><strong>${noShows.length}</strong></div>
+          <div class="metric"><span>نسبة عدم الحضور من البوابة</span><strong>${applicants.filter((item) => item.source === 'qobool').length ? Math.round((noShows.length / applicants.filter((item) => item.source === 'qobool').length) * 100) : 0}%</strong></div>
+        </section>
+        ${noShows.length === 0 ? '<div class="empty">لا يوجد مسجلون من البوابة بحالة لم يحضروا المقابلة.</div>' : `
+          <table>
+            <thead>
+              <tr><th>#</th><th>الاسم</th><th>رقم الهوية</th><th>رقم الجوال</th><th>رقم الانتظار</th><th>موعد المقابلة</th><th>البرنامج</th><th>الحالة</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `}
+        <script>window.addEventListener('load', () => window.print());</script>
+      </body>
+    </html>
+  `)
+  report.document.close()
 }
 
 function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }, selectedManager: CollegeManager) {
@@ -787,7 +870,9 @@ function App() {
     const pendingDocs = applicants.filter((item) => item.status.includes('مراجعة') || item.status.includes('استكمال')).length
     const interviewed = applicants.filter((item) => item.status === 'تم التقييم' || item.status === 'النتيجة معتمدة').length
     const scheduled = applicants.filter((item) => item.interviewAt).length
-    return { total: applicants.length, approved, pendingDocs, interviewed, scheduled }
+    const portalRegistered = applicants.filter((item) => item.source === 'qobool').length
+    const portalNoShows = getPortalNoShowApplicants(applicants).length
+    return { total: applicants.length, approved, pendingDocs, interviewed, scheduled, portalRegistered, portalNoShows }
   }, [applicants])
   const activeRole = applicantOnly ? 'applicant' : role
   const selectedManager = collegeManagers[selectedManagerIndex] ?? collegeManagers[0]
@@ -1035,6 +1120,7 @@ function App() {
             )}
             <button onClick={() => exportApplicantsExcel(applicants, selectedManager)} type="button"><Download size={17} /> تصدير Excel</button>
             <button onClick={() => openApplicantsPdfReport(applicants, stats, selectedManager)} type="button"><FileText size={17} /> تقرير PDF</button>
+            <button onClick={() => refreshApplicants()} type="button"><RefreshCcw size={17} /> مزامنة البيانات</button>
           </div>}
         </header>
 
@@ -1045,6 +1131,7 @@ function App() {
               <Metric icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} tone="amber" />
               <Metric icon={CalendarDays} label="مواعيد مجدولة" value={stats.scheduled} tone="teal" />
               <Metric icon={CheckCircle2} label="نتائج معتمدة" value={stats.approved} tone="green" />
+              <Metric icon={Clock3} label="من البوابة ولم يحضروا" value={stats.portalNoShows} tone="danger" />
             </section>
             <section className="insight-strip" aria-label="ملخص سريع">
               <div>
@@ -1077,9 +1164,10 @@ function App() {
           />
         )}
         {role === 'head' && (
-          <HeadView applicants={applicants} selected={selected} setSelectedId={setSelectedId} assignCommittee={assignCommittee} approveResult={approveResult} />
+          <HeadView applicants={applicants} selected={selected} setSelectedId={setSelectedId} assignCommittee={assignCommittee} approveResult={approveResult} updateApplicant={updateApplicant} />
         )}
         {role === 'committee' && <CommitteeView applicants={applicants} selected={selected} setSelectedId={setSelectedId} updateApplicant={updateApplicant} submitEvaluation={submitEvaluation} />}
+        {role === 'absent' && <PortalNoShowView applicants={applicants} selectedManager={selectedManager} stats={stats} />}
         {role === 'applicant' && (
           <ApplicantView
             applicants={applicants}
@@ -1153,7 +1241,7 @@ export function computeVisualAnalytics(applicants: Applicant[]) {
   }
 }
 
-function Metric({ icon: Icon, label, value, tone }: { icon: typeof Users; label: string; value: number; tone: 'blue' | 'amber' | 'teal' | 'green' }) {
+function Metric({ icon: Icon, label, value, tone }: { icon: typeof Users; label: string; value: number; tone: 'blue' | 'amber' | 'teal' | 'green' | 'danger' }) {
   return (
     <article className={`metric ${tone}`}>
       <Icon size={22} />
@@ -1297,6 +1385,11 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
           </tr>
         </thead>
         <tbody>
+          {applicants.length === 0 && (
+            <tr>
+              <td className="empty-table" colSpan={8}>لا توجد بيانات مطابقة.</td>
+            </tr>
+          )}
           {applicants.map((applicant) => (
             <tr className={selectedId === applicant.id ? 'selected' : ''} key={applicant.id} onClick={() => onSelect(applicant.id)}>
               <td data-label="رقم الطلب">{applicant.requestNo}</td>
@@ -1317,7 +1410,7 @@ function ApplicantTable({ applicants, selectedId, onSelect }: { applicants: Appl
 
 function statusTone(status: Status) {
   if (status.includes('معتمدة') || status.includes('معتمد') || status.includes('مكتمل')) return 'success'
-  if (status.includes('استكمال') || status.includes('تصحيح')) return 'danger'
+  if (status.includes('استكمال') || status.includes('تصحيح') || status.includes('لم يحضر') || status.includes('مستبعد')) return 'danger'
   if (status.includes('مراجعة') || status.includes('انتظار') || status.includes('اعتماد')) return 'warning'
   return 'info'
 }
@@ -1454,6 +1547,36 @@ function CollegeView({ applicants, stats }: { applicants: Applicant[]; stats: { 
   )
 }
 
+function PortalNoShowView({ applicants, selectedManager, stats }: {
+  applicants: Applicant[]
+  selectedManager: CollegeManager
+  stats: { portalRegistered: number; portalNoShows: number }
+}) {
+  const noShows = getPortalNoShowApplicants(applicants)
+  const noShowPercent = stats.portalRegistered ? Math.round((stats.portalNoShows / stats.portalRegistered) * 100) : 0
+  return (
+    <div className="grid two">
+      <section className="panel">
+        <div className="section-title"><h2>تقرير المسجلين من البوابة ولم يحضروا</h2><Clock3 size={21} /></div>
+        <div className="metrics compact-metrics">
+          <Metric icon={QrCode} label="إجمالي المسجلين من البوابة" value={stats.portalRegistered} tone="blue" />
+          <Metric icon={Clock3} label="لم يحضروا المقابلة" value={stats.portalNoShows} tone="danger" />
+          <Metric icon={BarChart3} label="نسبة عدم الحضور" value={noShowPercent} tone="amber" />
+        </div>
+        <div className="actions">
+          <button onClick={() => exportPortalNoShowExcel(applicants, selectedManager)} type="button"><Download size={17} /> تصدير تقرير Excel</button>
+          <button onClick={() => openPortalNoShowPdfReport(applicants, selectedManager)} type="button"><FileText size={17} /> تقرير PDF خاص</button>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="section-title"><h2>قائمة عدم الحضور</h2><ListChecks size={21} /></div>
+        <p className="report-note">يعرض هذا التقرير فقط المتقدمين المسجلين من البوابة وحالتهم: {noShowStatus}.</p>
+        <ApplicantTable applicants={noShows} onSelect={() => undefined} />
+      </section>
+    </div>
+  )
+}
+
 function OperationsView({ applicants, selected, setSelectedId, approveDocuments, updateApplicant }: {
   applicants: Applicant[]
   selected: Applicant
@@ -1477,18 +1600,20 @@ function OperationsView({ applicants, selected, setSelectedId, approveDocuments,
         <div className="actions">
           <button onClick={() => approveDocuments(selected.id)} type="button"><CheckCircle2 size={17} /> اعتماد الوثائق وإصدار الانتظار</button>
           <button onClick={() => updateApplicant(selected.id, { status: 'يحتاج إلى استكمال أو تصحيح' }, 'إعادة الطلب للاستكمال')} type="button">إعادة للاستكمال</button>
+          <button onClick={() => updateApplicant(selected.id, { status: noShowStatus }, 'تسجيل المتقدم بأنه لم يحضر المقابلة')} type="button"><Clock3 size={17} /> تسجيل لم يحضر</button>
         </div>
       </section>
     </div>
   )
 }
 
-function HeadView({ applicants, selected, setSelectedId, assignCommittee, approveResult }: {
+function HeadView({ applicants, selected, setSelectedId, assignCommittee, approveResult, updateApplicant }: {
   applicants: Applicant[]
   selected: Applicant
   setSelectedId: (id: string) => void
   assignCommittee: (id: string, committeeNumber: string, committeeTrainerIds: string[], translatorId: string) => void
   approveResult: (id: string) => void
+  updateApplicant: (id: string, patch: Partial<Applicant>, audit: string) => void
 }) {
   const initialCommitteeNumber = selected.committeeNumber ?? committees.find((committee) => committee.id === selected.committeeId)?.number ?? ''
   const [committeeNumber, setCommitteeNumber] = useState(initialCommitteeNumber)
@@ -1564,6 +1689,7 @@ function HeadView({ applicants, selected, setSelectedId, assignCommittee, approv
         <Details applicant={selected} />
         <div className="actions">
           <button onClick={() => approveResult(selected.id)} type="button"><ShieldCheck size={17} /> اعتماد النتيجة النهائية</button>
+          <button onClick={() => updateApplicant(selected.id, { status: noShowStatus }, 'تسجيل المتقدم بأنه لم يحضر المقابلة')} type="button"><Clock3 size={17} /> تسجيل لم يحضر</button>
         </div>
       </section>
     </div>

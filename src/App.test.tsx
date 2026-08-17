@@ -343,6 +343,33 @@ describe('Interview management system', () => {
     expect(screen.getByText('W-017')).toBeTruthy()
   })
 
+  it('shows a dedicated report for portal applicants who did not attend interviews', async () => {
+    const user = userEvent.setup()
+    const write = vi.fn()
+    const close = vi.fn()
+    vi.spyOn(window, 'open').mockReturnValue({
+      document: { write, close },
+    } as unknown as Window)
+    const portalApplicant = seedApplicants.find((applicant) => applicant.source === 'qobool')
+    expect(portalApplicant).toBeTruthy()
+    render(<App />)
+
+    await user.click(screen.getAllByText(portalApplicant?.name ?? '')[0])
+    await user.click(screen.getByRole('button', { name: /تسجيل لم يحضر/ }))
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'لم يحضروا المقابلة' }))
+
+    expect(screen.getByRole('heading', { name: 'تقرير المسجلين من البوابة ولم يحضروا' })).toBeTruthy()
+    expect(screen.getByText(portalApplicant?.name ?? '')).toBeTruthy()
+    expect(screen.getByText('يعرض هذا التقرير فقط المتقدمين المسجلين من البوابة وحالتهم: معتذر أو لم يحضر.')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /تقرير PDF خاص/ }))
+
+    expect(window.open).toHaveBeenCalled()
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('تقرير المسجلين من البوابة ولم يحضروا المقابلة'))
+    expect(write).toHaveBeenCalledWith(expect.stringContaining(portalApplicant?.name ?? ''))
+    expect(close).toHaveBeenCalled()
+  })
+
   it('assigns a committee and schedules an applicant by department head', async () => {
     const user = userEvent.setup()
     render(<App />)

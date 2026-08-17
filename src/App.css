@@ -409,6 +409,14 @@ button svg,
   color: var(--color-status-success-text);
 }
 
+.metric.danger::before {
+  background: var(--color-status-danger-text);
+}
+
+.metric.danger svg {
+  color: var(--color-status-danger-text);
+}
+
 .metric span {
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -419,6 +427,17 @@ button svg,
 .metric strong {
   margin-inline-start: auto;
   font-size: clamp(24px, 2.1vw, 30px);
+}
+
+.compact-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.report-note {
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
 }
 
 .visual-grid {
@@ -693,6 +712,11 @@ tbody tr {
 tbody tr:hover,
 tbody tr.selected {
   background: #f0fafc;
+}
+
+.empty-table {
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
 .status {
