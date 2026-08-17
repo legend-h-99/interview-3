@@ -187,7 +187,8 @@ const committees: Committee[] = [
   { id: 'c3', number: '3' },
 ]
 
-const trainerMembers = staffMembers.filter((member) => member.task.startsWith('لجنة '))
+const extraCommitteeTrainerIds = new Set(['s2', 's10'])
+const trainerMembers = staffMembers.filter((member) => member.task.startsWith('لجنة ') || extraCommitteeTrainerIds.has(member.id))
 const translatorMembers = staffMembers.filter((member) => member.task === 'التنظيم والترجمة')
 const acceptedApplicants = acceptedApplicantsData as AcceptedApplicant[]
 const neutralStatus: Status = 'غير محدد'
