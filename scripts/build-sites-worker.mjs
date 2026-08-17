@@ -439,10 +439,16 @@ async function updateApplicant(env, request, id) {
   if (!currentRow) return json({ error: 'Applicant not found' }, { status: 404 });
   const current = rowToApplicant(currentRow);
   const body = await request.json();
+  const patch = body.patch || {};
+  const nextAudit = Array.isArray(patch.audit)
+    ? patch.audit
+    : body.audit
+      ? [body.audit, ...current.audit].filter(Boolean).slice(0, 8)
+      : current.audit;
   const next = {
     ...current,
-    ...(body.patch || {}),
-    audit: [body.audit, ...current.audit].filter(Boolean).slice(0, 8),
+    ...patch,
+    audit: nextAudit,
   };
   await db.prepare(\`UPDATE applicants SET
     waiting_no = ?,

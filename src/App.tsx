@@ -818,17 +818,17 @@ function App() {
     return () => window.clearInterval(interval)
   }, [])
 
-  const updateApplicant = async (id: string, patch: Partial<Applicant>, audit: string) => {
+  const updateApplicant = async (id: string, patch: Partial<Applicant>, audit?: string) => {
     const next = applicants.map((applicant) =>
       applicant.id === id
-        ? { ...applicant, ...patch, audit: [audit, ...applicant.audit].slice(0, 8) }
+        ? { ...applicant, ...patch, audit: audit ? [audit, ...applicant.audit].slice(0, 8) : (patch.audit ?? applicant.audit) }
         : applicant,
     )
     setApplicants(next)
     const response = await apiFetch(`/api/applicants/${id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ patch, audit }),
+      body: JSON.stringify(audit ? { patch, audit } : { patch }),
     })
     if (response.ok) {
       const data = (await response.json()) as { applicant: Applicant }
@@ -1564,7 +1564,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
   applicants: Applicant[]
   selected: Applicant
   setSelectedId: (id: string) => void
-  updateApplicant: (id: string, patch: Partial<Applicant>, audit: string) => void
+  updateApplicant: (id: string, patch: Partial<Applicant>, audit?: string) => void
   submitEvaluation: (id: string) => void
 }) {
   const [committeeNumber, setCommitteeNumber] = useState('')
@@ -1594,13 +1594,13 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
 
   const selectTranslator = (value: string) => {
     setTranslatorId(value)
-    updateApplicant(activeApplicant.id, { translatorId: value || undefined }, value ? 'اختيار مترجم المقابلة' : 'إلغاء مترجم المقابلة')
+    updateApplicant(activeApplicant.id, { translatorId: value || undefined })
   }
 
   const toggleStaff = (id: string) => {
     const next = selectedStaffIds.includes(id) ? selectedStaffIds.filter((item) => item !== id) : [...selectedStaffIds, id]
     setSelectedStaffIds(next)
-    updateApplicant(activeApplicant.id, { committeeTrainerIds: next }, 'اختيار مدربي اللجنة')
+    updateApplicant(activeApplicant.id, { committeeTrainerIds: next })
   }
 
   const setScore = (key: keyof Pick<ReturnType<typeof normalizeScores>, 'signLanguage' | 'appearance' | 'responseSpeed'>, value: number) => {
