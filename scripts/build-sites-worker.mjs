@@ -59,6 +59,17 @@ function normalizeImportedPhone(phone) {
   return phone.startsWith('5') ? `0${phone}` : phone
 }
 
+function graduationYearOnly(value) {
+  return String(value ?? '').replace(/[٠-٩۰-۹]/g, (digit) => {
+    const arabicDigits = '٠١٢٣٤٥٦٧٨٩'
+    const persianDigits = '۰۱۲۳۴۵۶۷۸۹'
+    const arabicIndex = arabicDigits.indexOf(digit)
+    if (arabicIndex >= 0) return String(arabicIndex)
+    const persianIndex = persianDigits.indexOf(digit)
+    return persianIndex >= 0 ? String(persianIndex) : digit
+  }).replace(/\D/g, '').slice(0, 4)
+}
+
 function acceptedToApplicant(item, index) {
   return {
     id: `accepted-${item.nationalId}`,
@@ -98,7 +109,7 @@ const seedApplicants = [
     nationality: 'سعودي',
     age: 19,
     certificateType: 'ثانوية عامة',
-    graduationDate: '2026-06-15',
+    graduationDate: '2026',
     phone: '0551234567',
     extraPhone: '0557654321',
     qualification: 'ثانوية عامة - مسار علمي',
@@ -122,7 +133,7 @@ const seedApplicants = [
     nationality: 'سعودي',
     age: 22,
     certificateType: 'دبلوم حاسب',
-    graduationDate: '2025-05-20',
+    graduationDate: '2025',
     phone: '0569001122',
     extraPhone: '0569003344',
     qualification: 'دبلوم حاسب',
@@ -143,7 +154,7 @@ const seedApplicants = [
     nationality: 'سعودي',
     age: 20,
     certificateType: 'ثانوية صناعية',
-    graduationDate: '2026-06-10',
+    graduationDate: '2026',
     phone: '0503332211',
     extraPhone: '0503332244',
     qualification: 'ثانوية صناعية',
@@ -165,6 +176,7 @@ const files = new Map(${JSON.stringify(files.map((file) => [file.path, file]))})
 const seedApplicants = ${JSON.stringify(seedApplicants)};
 const defaultInterviewScores = ${JSON.stringify(defaultInterviewScores)};
 const neutralStatus = ${JSON.stringify(neutralStatus)};
+const graduationYearOnly = ${graduationYearOnly.toString()};
 const maxConcurrentUsers = 150;
 const schemaSql = ${JSON.stringify(`CREATE TABLE IF NOT EXISTS applicants (
   id TEXT PRIMARY KEY,
@@ -290,7 +302,7 @@ function rowToApplicant(row) {
     nationality: row.nationality || '',
     age: Number(row.age || 0),
     certificateType: row.certificate_type || row.qualification || '',
-    graduationDate: row.graduation_date || '',
+    graduationDate: graduationYearOnly(row.graduation_date || ''),
     phone: row.phone,
     extraPhone: row.extra_phone || '',
     qualification: row.qualification,
@@ -331,7 +343,7 @@ function insertApplicantStatement(db, applicant) {
     applicant.nationality || '',
     Number(applicant.age || 0),
     applicant.certificateType || applicant.qualification || '',
-    applicant.graduationDate || '',
+    graduationYearOnly(applicant.graduationDate || ''),
     applicant.phone,
     applicant.extraPhone || '',
     applicant.qualification,
@@ -416,7 +428,7 @@ async function createApplicant(env, request) {
     nationality: body.nationality || '',
     age: toNumber(body.age),
     certificateType: body.certificateType || body.qualification || '',
-    graduationDate: body.graduationDate || '',
+    graduationDate: graduationYearOnly(body.graduationDate || ''),
     phone: body.phone,
     extraPhone: body.extraPhone || '',
     qualification: body.qualification || body.certificateType || '',
@@ -485,7 +497,7 @@ async function updateApplicant(env, request, id) {
       next.nationality || '',
       Number(next.age || 0),
       next.certificateType || next.qualification || '',
-      next.graduationDate || '',
+      graduationYearOnly(next.graduationDate || ''),
       next.phone,
       next.extraPhone || '',
       next.qualification,

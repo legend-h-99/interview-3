@@ -208,6 +208,10 @@ function normalizeDigits(value: string) {
   })
 }
 
+function graduationYearOnly(value: string) {
+  return normalizeDigits(value).replace(/\D/g, '').slice(0, 4)
+}
+
 function flexibleNumber(value: string | number | undefined) {
   const normalized = normalizeDigits(String(value ?? '')).replace(/[^0-9.-]/g, '')
   const number = Number(normalized)
@@ -255,7 +259,7 @@ export const seedApplicants: Applicant[] = [
     nationality: 'سعودي',
     age: 19,
     certificateType: 'ثانوية عامة',
-    graduationDate: '2026-06-15',
+    graduationDate: '2026',
     phone: '0551234567',
     extraPhone: '0557654321',
     qualification: 'ثانوية عامة - مسار علمي',
@@ -279,7 +283,7 @@ export const seedApplicants: Applicant[] = [
     nationality: 'سعودي',
     age: 22,
     certificateType: 'دبلوم حاسب',
-    graduationDate: '2025-05-20',
+    graduationDate: '2025',
     phone: '0569001122',
     extraPhone: '0569003344',
     qualification: 'دبلوم حاسب',
@@ -300,7 +304,7 @@ export const seedApplicants: Applicant[] = [
     nationality: 'سعودي',
     age: 20,
     certificateType: 'ثانوية صناعية',
-    graduationDate: '2026-06-10',
+    graduationDate: '2026',
     phone: '0503332211',
     extraPhone: '0503332244',
     qualification: 'ثانوية صناعية',
@@ -378,7 +382,7 @@ const maxConcurrentUsers = 150
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'تاريخ التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'المجموع من 50', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
 let fallbackSessionId = ''
 
@@ -460,7 +464,7 @@ function applicantToForm(applicant: Applicant): ApplicantForm {
     nationality: applicant.nationality || 'سعودي',
     age: applicant.age ? String(applicant.age) : '',
     certificateType: applicant.certificateType,
-    graduationDate: applicant.graduationDate,
+    graduationDate: graduationYearOnly(applicant.graduationDate),
     phone: applicant.phone,
     extraPhone: applicant.extraPhone,
   }
@@ -473,7 +477,7 @@ function formToApplicantPatch(form: ApplicantForm): Partial<Applicant> {
     nationality: form.nationality,
     age: Number(form.age || 0),
     certificateType: form.certificateType,
-    graduationDate: form.graduationDate,
+    graduationDate: graduationYearOnly(form.graduationDate),
     phone: form.phone,
     extraPhone: form.extraPhone,
     qualification: form.certificateType,
@@ -517,7 +521,7 @@ function exportApplicantsExcel(applicants: Applicant[], selectedManager: College
       applicant.nationality,
       applicant.age,
       applicant.certificateType,
-      applicant.graduationDate,
+      graduationYearOnly(applicant.graduationDate),
       applicant.phone,
       applicant.extraPhone,
       applicant.program ?? '',
@@ -903,7 +907,7 @@ function App() {
           nationality: form.nationality,
           age: flexibleNumber(form.age),
           certificateType: form.certificateType,
-          graduationDate: form.graduationDate,
+          graduationDate: graduationYearOnly(form.graduationDate),
           phone: form.phone,
           extraPhone: form.extraPhone,
           qualification: form.certificateType,
@@ -929,7 +933,7 @@ function App() {
           nationality: form.nationality,
           age: flexibleNumber(form.age),
           certificateType: form.certificateType,
-          graduationDate: form.graduationDate,
+          graduationDate: graduationYearOnly(form.graduationDate),
           phone: form.phone,
           extraPhone: form.extraPhone,
           qualification: form.certificateType,
@@ -1334,7 +1338,7 @@ function Details({ applicant, hideInterviewPageSections = false }: { applicant: 
         <Info label="الجنسية" value={applicant.nationality} />
         <Info label="العمر" value={`${applicant.age}`} />
         <Info label="نوع الشهادة" value={applicant.certificateType} />
-        <Info label="تاريخ التخرج" value={applicant.graduationDate} />
+        <Info label="سنة التخرج" value={graduationYearOnly(applicant.graduationDate)} />
         <Info label="رقم الجوال" value={applicant.phone} />
         <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
         <Info label="المصدر" value={registrationSourceLabel(applicant.source)} />
@@ -1787,7 +1791,7 @@ function CommitteeView({ applicants, selected, setSelectedId, updateApplicant, s
             <label>الجنسية<input value={editForm.nationality} onChange={(event) => setEditForm({ ...editForm, nationality: event.target.value })} /></label>
             <label>العمر<input inputMode="numeric" value={editForm.age} onChange={(event) => setEditForm({ ...editForm, age: event.target.value })} /></label>
             <label>نوع الشهادة<input value={editForm.certificateType} onChange={(event) => setEditForm({ ...editForm, certificateType: event.target.value })} /></label>
-            <label>تاريخ التخرج<input type="date" value={editForm.graduationDate} onChange={(event) => setEditForm({ ...editForm, graduationDate: event.target.value })} /></label>
+            <label>سنة التخرج<input inputMode="numeric" maxLength={4} pattern="[0-9٠-٩۰-۹]{4}" placeholder="مثال: 2026 أو 1447" value={editForm.graduationDate} onChange={(event) => setEditForm({ ...editForm, graduationDate: graduationYearOnly(event.target.value) })} /></label>
             <label>رقم الجوال<input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} /></label>
             <label>رقم جوال إضافي<input value={editForm.extraPhone} onChange={(event) => setEditForm({ ...editForm, extraPhone: event.target.value })} /></label>
           </div>
@@ -1904,7 +1908,7 @@ function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalI
       nationality: found.nationality || 'سعودي',
       age: found.age ? String(found.age) : '',
       certificateType: found.certificateType,
-      graduationDate: found.graduationDate,
+      graduationDate: graduationYearOnly(found.graduationDate),
       phone: found.phone,
       extraPhone: found.extraPhone,
     })
@@ -1940,7 +1944,7 @@ function ApplicantView({ applicants, issuedApplicantId, nationalId, setNationalI
             <label>الجنسية<input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} /></label>
             <label>العمر<input inputMode="numeric" value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} /></label>
             <label>نوع الشهادة<input value={form.certificateType} onChange={(event) => setForm({ ...form, certificateType: event.target.value })} /></label>
-            <label>تاريخ التخرج<input type="date" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: event.target.value })} /></label>
+            <label>سنة التخرج<input inputMode="numeric" maxLength={4} pattern="[0-9٠-٩۰-۹]{4}" placeholder="مثال: 2026 أو 1447" value={form.graduationDate} onChange={(event) => setForm({ ...form, graduationDate: graduationYearOnly(event.target.value) })} /></label>
             <label>رقم الجوال<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
             <label>رقم جوال إضافي<input value={form.extraPhone} onChange={(event) => setForm({ ...form, extraPhone: event.target.value })} /></label>
             <button disabled={submitState.loading} onClick={registerApplicant} type="button">

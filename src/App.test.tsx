@@ -95,7 +95,7 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
     await user.type(screen.getByLabelText('العمر'), '٢١ سنة')
     await user.type(screen.getByLabelText('نوع الشهادة'), 'High school / ثانوية عامة')
-    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
+    await user.type(screen.getByLabelText('سنة التخرج'), '2026')
     await user.type(screen.getByLabelText('رقم الجوال'), '٠٥٥7778888')
     await user.type(screen.getByLabelText('رقم جوال إضافي'), '0557779999')
     await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
@@ -119,7 +119,7 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
     await user.type(screen.getByLabelText('العمر'), '21')
     await user.type(screen.getByLabelText('نوع الشهادة'), 'ثانوية عامة')
-    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
+    await user.type(screen.getByLabelText('سنة التخرج'), '2026')
     await user.type(screen.getByLabelText('رقم الجوال'), '0557778888')
     await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
 
@@ -143,7 +143,7 @@ describe('Interview management system', () => {
 
     await user.clear(screen.getByLabelText('العمر'))
     await user.type(screen.getByLabelText('العمر'), '21')
-    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-06-20')
+    await user.type(screen.getByLabelText('سنة التخرج'), '2026')
     await user.type(screen.getByLabelText('رقم جوال إضافي'), '0557770000')
     await user.click(screen.getByRole('button', { name: /متابعة وإصدار رقم الانتظار/ }))
 
@@ -273,7 +273,7 @@ describe('Interview management system', () => {
     await user.type(screen.getByLabelText('الجنسية'), 'سعودي')
     await user.type(screen.getByLabelText('العمر'), '20')
     await user.type(screen.getByLabelText('نوع الشهادة'), 'ثانوية عامة')
-    await user.type(screen.getByLabelText('تاريخ التخرج'), '2026-05-30')
+    await user.type(screen.getByLabelText('سنة التخرج'), '2026')
     await user.type(screen.getByLabelText('رقم الجوال'), '0551112222')
     await user.type(screen.getByLabelText('رقم جوال إضافي'), '0551113333')
     await user.click(screen.getByRole('button', { name: /التحقق وإصدار رقم المقابلة/ }))
