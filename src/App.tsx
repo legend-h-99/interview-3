@@ -393,9 +393,8 @@ const noShowStatus: Status = 'معتذر أو لم يحضر'
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
 const fullInterviewScore = 50
-const exportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الطلب', 'الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'البرنامج', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'عدد المسجلين من البوابة وحضروا المقابلة', 'عدد الذين لم يحضروا المقابلة', 'عدد المسجلين بشكل مباشر', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
-const qobooliReportHeaders = ['اسم الكلية', 'القسم', 'رئيس القسم / رئيس اللجنة', 'مسؤول إدارة الكلية', 'وكيل شؤون المتدربين', 'رقم الهوية', 'الاسم في منصة قبولي', 'الاسم في النظام', 'حالة المطابقة', 'حالة الحضور', 'رقم الجوال', 'المنشأة', 'التخصص', 'البرنامج', 'رقم الرغبة', 'حالة القبول', 'الحالة في النظام', 'رقم الانتظار', 'الدرجة الكاملة', 'الدرجة', 'الملاحظات', 'المصدر']
-const staffExportHeaders = ['الاسم', 'رقم الحاسب', 'المهام']
+const exportHeaders = ['الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'عدد المسجلين من البوابة وحضروا المقابلة', 'عدد الذين لم يحضروا المقابلة', 'عدد المسجلين بشكل مباشر', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
+const qobooliReportHeaders = ['رقم الهوية', 'الاسم في منصة قبولي', 'الاسم في النظام', 'حالة المطابقة', 'حالة الحضور', 'رقم الجوال', 'التخصص', 'رقم الرغبة', 'حالة القبول', 'الحالة في النظام', 'رقم الانتظار', 'الدرجة الكاملة', 'الدرجة', 'الملاحظات', 'المصدر']
 let fallbackSessionId = ''
 
 function sessionId() {
@@ -539,22 +538,15 @@ function getQobooliReportStats(applicants: Applicant[]) {
   return { total: acceptedApplicants.length, exactMatches, idOnlyMatches, missing, attended, noShows }
 }
 
-function buildQobooliReportRows(applicants: Applicant[], selectedManager: CollegeManager) {
+function buildQobooliReportRows(applicants: Applicant[], _selectedManager: CollegeManager) {
   return buildQobooliMatches(applicants).map(({ accepted, systemApplicant, matchStatus, attendanceStatus, isPresent }) => [
-    collegeProfile.collegeName,
-    collegeProfile.departmentName,
-    collegeProfile.departmentHeadAndCommitteeChair,
-    formatManager(selectedManager),
-    collegeProfile.traineeAffairsDeputy,
     accepted.nationalId,
     accepted.name,
     systemApplicant?.name ?? '',
     matchStatus,
     attendanceStatus,
     normalizeImportedPhone(accepted.phone),
-    accepted.organization,
     accepted.major,
-    accepted.program,
     accepted.preferenceNo,
     accepted.admissionStatus,
     systemApplicant?.status ?? 'غير موجود',
@@ -615,17 +607,11 @@ function normalizeScores(scores: InterviewScores = {}) {
   }
 }
 
-function buildApplicantReportRows(applicants: Applicant[], selectedManager: CollegeManager) {
+function buildApplicantReportRows(applicants: Applicant[], _selectedManager: CollegeManager) {
   const sourceStats = getSourceStats(applicants)
   const rows = applicants.map((applicant) => {
     const scores = normalizeScores(applicant.scores)
     return [
-      collegeProfile.collegeName,
-      collegeProfile.departmentName,
-      collegeProfile.departmentHeadAndCommitteeChair,
-      formatManager(selectedManager),
-      collegeProfile.traineeAffairsDeputy,
-      applicant.requestNo,
       applicant.name,
       applicant.nationalId,
       applicant.nationality,
@@ -634,7 +620,6 @@ function buildApplicantReportRows(applicants: Applicant[], selectedManager: Coll
       graduationYearOnly(applicant.graduationDate),
       applicant.phone,
       applicant.extraPhone,
-      applicant.program ?? '',
       applicant.admissionStatus ?? '',
       registrationSourceLabel(applicant.source),
       applicant.status,
@@ -660,18 +645,14 @@ function buildApplicantReportRows(applicants: Applicant[], selectedManager: Coll
       applicant.notes,
     ]
   })
-  const staffRows = staffMembers.map((member) => [member.name, member.computerNo ?? '', member.task])
-  return { rows, staffRows }
+  return { rows }
 }
 
 function buildApplicantCsv(applicants: Applicant[], selectedManager: CollegeManager) {
-  const { rows, staffRows } = buildApplicantReportRows(applicants, selectedManager)
+  const { rows } = buildApplicantReportRows(applicants, selectedManager)
   return [
     'بيانات المتقدمين',
     [exportHeaders, ...rows].map((row) => row.map(csvCell).join(',')).join('\n'),
-    '',
-    'بيانات فرق العمل',
-    [staffExportHeaders, ...staffRows].map((row) => row.map(csvCell).join(',')).join('\n'),
   ].join('\n')
 }
 
@@ -681,11 +662,10 @@ function exportApplicantsCsv(applicants: Applicant[], selectedManager: CollegeMa
 }
 
 function exportApplicantsXlsx(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
-  const { rows, staffRows } = buildApplicantReportRows(applicants, selectedManager)
+  const { rows } = buildApplicantReportRows(applicants, selectedManager)
   downloadBlob(
     buildXlsxBlob([
       { name: 'بيانات المتقدمين', rows: [exportHeaders, ...rows] },
-      { name: 'فرق العمل', rows: [staffExportHeaders, ...staffRows] },
     ]),
     reportFileName(fileLabel, 'xlsx'),
   )
@@ -718,7 +698,7 @@ function buildXlsxBlob(sheets: { name: string; rows: ReportCell[][] }[]) {
   }, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 }
 
-function exportApplicantsPptx(applicants: Applicant[], selectedManager: CollegeManager, fileLabel = 'applicants') {
+function exportApplicantsPptx(applicants: Applicant[], _selectedManager: CollegeManager, fileLabel = 'applicants') {
   const analytics = computeVisualAnalytics(applicants)
   const title = fileLabel === 'portal-no-shows' ? 'تقرير عدم حضور مقابلات البوابة' : 'تقرير منصة interview 3'
   const totalPortal = applicants.filter((item) => item.source === 'qobool').length
@@ -739,11 +719,9 @@ function exportApplicantsPptx(applicants: Applicant[], selectedManager: CollegeM
   downloadBlob(
     buildPptxBlob([
       { text: title, x: 500000, y: 300000, w: 11300000, h: 500000, size: 2600, bold: true, color: '182235' },
-      { text: `${collegeProfile.collegeName} - ${collegeProfile.departmentName}`, x: 500000, y: 850000, w: 11300000, h: 320000, size: 1300, color: '475569' },
       { text: metricLines.join('\n'), x: 6900000, y: 1500000, w: 5200000, h: 1500000, size: 1500, bold: true, color: '0F6B8F', fill: 'FFFFFF' },
       { text: `توزيع الحالات\n${statusLines.join('\n')}`, x: 6900000, y: 3300000, w: 5200000, h: 2400000, size: 1300, color: '334155', fill: 'FFFFFF' },
       { text: `أول الأسماء في التقرير\n${sampleLines.join('\n') || 'لا توجد بيانات مطابقة'}`, x: 700000, y: 1500000, w: 5600000, h: 4200000, size: 1250, color: '182235', fill: 'FFFFFF' },
-      { text: `مسؤول إدارة الكلية: ${formatManager(selectedManager)} | وكيل شؤون المتدربين: ${collegeProfile.traineeAffairsDeputy}`, x: 700000, y: 6600000, w: 11300000, h: 320000, size: 1000, color: '64748B' },
     ]),
     reportFileName(fileLabel, 'pptx'),
   )
@@ -778,7 +756,7 @@ function exportQobooliXlsx(applicants: Applicant[], selectedManager: CollegeMana
   )
 }
 
-function exportQobooliPptx(applicants: Applicant[], selectedManager: CollegeManager) {
+function exportQobooliPptx(applicants: Applicant[], _selectedManager: CollegeManager) {
   const stats = getQobooliReportStats(applicants)
   const sampleLines = buildQobooliMatches(applicants).slice(0, 10).map((item, index) => `${index + 1}. ${item.accepted.name} - ${item.accepted.nationalId} - ${item.matchStatus}`)
   const metricLines = [
@@ -792,10 +770,8 @@ function exportQobooliPptx(applicants: Applicant[], selectedManager: CollegeMana
   downloadBlob(
     buildPptxBlob([
       { text: 'تقرير منصة قبولي', x: 500000, y: 300000, w: 11300000, h: 500000, size: 2600, bold: true, color: '182235' },
-      { text: `${collegeProfile.collegeName} - ${collegeProfile.departmentName}`, x: 500000, y: 850000, w: 11300000, h: 320000, size: 1300, color: '475569' },
       { text: metricLines.join('\n'), x: 6900000, y: 1500000, w: 5200000, h: 2200000, size: 1450, bold: true, color: '0F6B8F', fill: 'FFFFFF' },
       { text: `أول سجلات المطابقة\n${sampleLines.join('\n')}`, x: 700000, y: 1500000, w: 5600000, h: 4400000, size: 1200, color: '182235', fill: 'FFFFFF' },
-      { text: `مسؤول إدارة الكلية: ${formatManager(selectedManager)} | المصدر: ${qobooliSourceLabel()}`, x: 700000, y: 6600000, w: 11300000, h: 320000, size: 1000, color: '64748B' },
     ]),
     reportFileName('qobooli-report', 'pptx'),
   )
@@ -991,7 +967,7 @@ function pdfSourceSummary(applicants: Applicant[]) {
   `
 }
 
-function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
+function openPortalNoShowPdfReport(applicants: Applicant[], _selectedManager: CollegeManager) {
   const noShows = getPortalNoShowApplicants(applicants)
   const sourceStats = getSourceStats(applicants)
   const report = window.open('', '_blank', 'width=1024,height=720')
@@ -1004,7 +980,6 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
       <td>${escapeHtml(applicant.phone)}</td>
       <td>${escapeHtml(applicant.waitingNo ?? 'لم يصدر')}</td>
       <td>${escapeHtml(applicant.interviewAt ?? 'غير مجدول')}</td>
-      <td>${escapeHtml(applicant.program ?? applicant.certificateType)}</td>
       <td>${escapeHtml(applicant.status)}</td>
       <td>${fullInterviewScore}</td>
       <td>${escapeHtml(calculateScore(applicant))}</td>
@@ -1021,8 +996,8 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
           header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
           h1 { margin: 0 0 8px; font-size: 28px; }
           p { margin: 0; color: #667085; }
-          .identity, .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
-          .identity div, .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; background: #fafdff; }
+          .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+          .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; background: #fafdff; }
           span { display: block; color: #667085; font-size: 12px; }
           strong { display: block; margin-top: 5px; font-size: 16px; }
           .metric strong { font-size: 28px; color: #991b1b; }
@@ -1038,14 +1013,6 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
           <h1>تقرير المسجلين من البوابة ولم يحضروا المقابلة</h1>
           <p>interview 3 - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
         </header>
-        <section class="identity">
-          <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
-          <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
-          <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
-          <div><span>رئيس القسم / رئيس اللجنة</span><strong>${escapeHtml(collegeProfile.departmentHeadAndCommitteeChair)}</strong></div>
-          <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
-          <div><span>معيار التقرير</span><strong>المصدر: مسجل من البوابة، الحالة: ${escapeHtml(noShowStatus)}</strong></div>
-        </section>
         <section class="metrics">
           <div class="metric"><span>إجمالي المسجلين من البوابة</span><strong>${applicants.filter((item) => item.source === 'qobool').length}</strong></div>
           <div class="metric"><span>من البوابة وحضروا المقابلة</span><strong>${sourceStats.portalAttended}</strong></div>
@@ -1056,7 +1023,7 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
         ${noShows.length === 0 ? '<div class="empty">لا يوجد مسجلون من البوابة بحالة لم يحضروا المقابلة.</div>' : `
           <table>
             <thead>
-              <tr><th>#</th><th>الاسم</th><th>رقم الهوية</th><th>رقم الجوال</th><th>رقم الانتظار</th><th>موعد المقابلة</th><th>البرنامج</th><th>الحالة</th><th>الدرجة الكاملة</th><th>المجموع</th></tr>
+              <tr><th>#</th><th>الاسم</th><th>رقم الهوية</th><th>رقم الجوال</th><th>رقم الانتظار</th><th>موعد المقابلة</th><th>الحالة</th><th>الدرجة الكاملة</th><th>المجموع</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
@@ -1068,7 +1035,7 @@ function openPortalNoShowPdfReport(applicants: Applicant[], selectedManager: Col
   report.document.close()
 }
 
-function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }, selectedManager: CollegeManager) {
+function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number; approved: number; pendingDocs: number; scheduled: number }, _selectedManager: CollegeManager) {
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
   const analytics = computeVisualAnalytics(applicants)
@@ -1086,7 +1053,6 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
     const sourceStats = getSourceStats(applicants)
     return `
       <tr>
-        <td>${escapeHtml(applicant.requestNo)}</td>
         <td>${escapeHtml(applicant.name)}</td>
         <td>${escapeHtml(applicant.nationalId)}</td>
         <td>${escapeHtml(applicant.status)}</td>
@@ -1121,10 +1087,6 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
           header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
           h1 { margin: 0 0 8px; font-size: 28px; }
           p { margin: 0; color: #667085; }
-          .identity { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0; }
-          .identity div { border: 1px solid #d9e2ec; border-radius: 8px; padding: 10px 12px; background: #fafdff; }
-          .identity span { display: block; color: #667085; font-size: 12px; }
-          .identity strong { display: block; margin-top: 4px; font-size: 15px; }
           .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
           .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; }
           .metric span { display: block; color: #667085; font-size: 12px; }
@@ -1153,13 +1115,6 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
           <h1>تقرير interview 3</h1>
           <p>وحدة القبول والمقابلات - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
         </header>
-        <section class="identity">
-          <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
-          <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
-          <div><span>رئيس القسم / رئيس اللجنة</span><strong>${escapeHtml(collegeProfile.departmentHeadAndCommitteeChair)}</strong></div>
-          <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
-          <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
-        </section>
         <section class="metrics">
           <div class="metric"><span>إجمالي المتقدمين</span><strong>${stats.total}</strong></div>
           <div class="metric"><span>طلبات قيد المراجعة</span><strong>${stats.pendingDocs}</strong></div>
@@ -1171,24 +1126,9 @@ function openApplicantsPdfReport(applicants: Applicant[], stats: { total: number
         ${sourceSummary}
         <table>
           <thead>
-            <tr><th>رقم الطلب</th><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>الدرجة الكاملة</th><th>المجموع</th><th>من البوابة وحضروا</th><th>لم يحضروا</th><th>مباشر</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
+            <tr><th>المتقدم</th><th>رقم الهوية</th><th>الحالة</th><th>رقم المقابلة</th><th>المصدر</th><th>الإشارة /25</th><th>المظهر /5</th><th>معلومات عامة /15</th><th>سرعة الاستجابة /5</th><th>الدرجة الكاملة</th><th>المجموع</th><th>من البوابة وحضروا</th><th>لم يحضروا</th><th>مباشر</th><th>إعاقة مصاحبة</th><th>ضعيف سمع</th><th>يتقن الإشارة</th><th>ضعف القدرات</th><th>متميز</th></tr>
           </thead>
           <tbody>${rows}</tbody>
-        </table>
-        <h2>بيانات فرق العمل</h2>
-        <table>
-          <thead>
-            <tr><th>الاسم</th><th>رقم الحاسب</th><th>المهام</th></tr>
-          </thead>
-          <tbody>
-            ${staffMembers.map((member) => `
-              <tr>
-                <td>${escapeHtml(member.name)}</td>
-                <td>${escapeHtml(member.computerNo ?? '')}</td>
-                <td>${escapeHtml(member.task)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
         </table>
         <script>window.addEventListener('load', () => window.print());</script>
       </body>
@@ -2048,7 +1988,7 @@ function QobooliReportView({ applicants, selectedManager }: {
   )
 }
 
-function openSourcePdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
+function openSourcePdfReport(applicants: Applicant[], _selectedManager: CollegeManager) {
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
   const sourceStats = getSourceStats(applicants)
@@ -2072,8 +2012,7 @@ function openSourcePdfReport(applicants: Applicant[], selectedManager: CollegeMa
       <body>
         <header>
           <h1>تقرير المصدر</h1>
-          <p>${escapeHtml(collegeProfile.collegeName)} - ${escapeHtml(collegeProfile.departmentName)}</p>
-          <p>مسؤول إدارة الكلية: ${escapeHtml(formatManager(selectedManager))}</p>
+          <p>interview 3 - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
         </header>
         <table>
           <thead><tr><th>المؤشر</th><th>العدد</th></tr></thead>
@@ -2091,7 +2030,7 @@ function openSourcePdfReport(applicants: Applicant[], selectedManager: CollegeMa
   report.document.close()
 }
 
-function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeManager) {
+function openQobooliPdfReport(applicants: Applicant[], _selectedManager: CollegeManager) {
   const report = window.open('', '_blank', 'width=1024,height=720')
   if (!report) return
   const stats = getQobooliReportStats(applicants)
@@ -2104,9 +2043,7 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
       <td>${escapeHtml(matchStatus)}</td>
       <td>${escapeHtml(attendanceStatus)}</td>
       <td>${escapeHtml(normalizeImportedPhone(accepted.phone))}</td>
-      <td>${escapeHtml(accepted.organization)}</td>
       <td>${escapeHtml(accepted.major)}</td>
-      <td>${escapeHtml(accepted.program)}</td>
       <td>${escapeHtml(accepted.preferenceNo)}</td>
       <td>${escapeHtml(accepted.admissionStatus)}</td>
       <td>${escapeHtml(systemApplicant?.status ?? 'غير موجود')}</td>
@@ -2128,8 +2065,8 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
           header { border-bottom: 3px solid #0f6b8f; padding-bottom: 16px; margin-bottom: 20px; }
           h1 { margin: 0 0 8px; font-size: 28px; }
           p { margin: 0; color: #667085; }
-          .identity, .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
-          .identity div, .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; background: #fafdff; }
+          .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+          .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; background: #fafdff; }
           span { display: block; color: #667085; font-size: 12px; }
           strong { display: block; margin-top: 5px; font-size: 16px; }
           .metric strong { font-size: 28px; color: #0f6b8f; }
@@ -2144,14 +2081,6 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
           <h1>تقرير منصة قبولي</h1>
           <p>تقرير مستقل لمطابقة الاسم ورقم الهوية - ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</p>
         </header>
-        <section class="identity">
-          <div><span>اسم الكلية</span><strong>${escapeHtml(collegeProfile.collegeName)}</strong></div>
-          <div><span>القسم</span><strong>${escapeHtml(collegeProfile.departmentName)}</strong></div>
-          <div><span>رئيس القسم / رئيس اللجنة</span><strong>${escapeHtml(collegeProfile.departmentHeadAndCommitteeChair)}</strong></div>
-          <div><span>مسؤول إدارة الكلية</span><strong>${escapeHtml(formatManager(selectedManager))}</strong></div>
-          <div><span>وكيل شؤون المتدربين</span><strong>${escapeHtml(collegeProfile.traineeAffairsDeputy)}</strong></div>
-          <div><span>المصدر</span><strong>${escapeHtml(qobooliSourceLabel())}</strong></div>
-        </section>
         <section class="metrics">
           <div class="metric"><span>إجمالي سجلات قبولي</span><strong>${stats.total}</strong></div>
           <div class="metric"><span>مطابق بالهوية والاسم</span><strong>${stats.exactMatches}</strong></div>
@@ -2162,7 +2091,7 @@ function openQobooliPdfReport(applicants: Applicant[], selectedManager: CollegeM
         </section>
         <table>
           <thead>
-            <tr><th>#</th><th>رقم الهوية</th><th>الاسم في قبولي</th><th>الاسم في النظام</th><th>حالة المطابقة</th><th>حالة الحضور</th><th>رقم الجوال</th><th>المنشأة</th><th>التخصص</th><th>البرنامج</th><th>رقم الرغبة</th><th>حالة القبول</th><th>حالة النظام</th><th>رقم الانتظار</th><th>الدرجة الكاملة</th><th>الدرجة</th><th>الملاحظات</th><th>المصدر</th></tr>
+            <tr><th>#</th><th>رقم الهوية</th><th>الاسم في قبولي</th><th>الاسم في النظام</th><th>حالة المطابقة</th><th>حالة الحضور</th><th>رقم الجوال</th><th>التخصص</th><th>رقم الرغبة</th><th>حالة القبول</th><th>حالة النظام</th><th>رقم الانتظار</th><th>الدرجة الكاملة</th><th>الدرجة</th><th>الملاحظات</th><th>المصدر</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
