@@ -184,6 +184,25 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'متوسطات التقييم' })).toBeTruthy()
   })
 
+  it('shows the advanced enterprise dashboard with filters and saved preferences', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'واجهات النظام' })).getByRole('button', { name: 'داشبورد متقدم' }))
+
+    expect(screen.getByRole('heading', { name: 'ملخص تنفيذي' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'تحليلات مرئية' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'جدول المتابعة الذكي' })).toBeTruthy()
+    expect(screen.getByText('GET /api/applicants { applicants: Applicant[] }')).toBeTruthy()
+
+    await user.type(screen.getByLabelText('بحث الداشبورد'), 'سالم عبدالله بن محمد')
+    expect(screen.getByText('سالم عبدالله بن محمد')).toBeTruthy()
+    expect(screen.queryByText('رائد علي الشهري')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /داكن/ }))
+    expect(screen.getByRole('button', { name: /فاتح/ })).toBeTruthy()
+  })
+
   it('supports a separate applicant inquiry page', async () => {
     const user = userEvent.setup()
     render(<App />)

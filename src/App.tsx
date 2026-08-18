@@ -4,27 +4,34 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock3,
+  Database,
   Download,
   FileCheck2,
   FileText,
+  Filter,
   GraduationCap,
+  GripVertical,
+  LineChart,
   LayoutDashboard,
   ListChecks,
+  Moon,
   QrCode,
   RefreshCcw,
   Search,
   ShieldCheck,
   Sparkles,
+  Sun,
   UploadCloud,
   UserCheck,
   Users,
 } from 'lucide-react'
 import { strToU8, zipSync } from 'fflate'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import './App.css'
 import acceptedApplicantsData from './data/acceptedApplicants.json'
 
-type Role = 'college' | 'trainees' | 'head' | 'committee' | 'inquiry' | 'sourceReport' | 'qobooliReport' | 'absent' | 'applicant'
+type Role = 'dashboard' | 'college' | 'trainees' | 'head' | 'committee' | 'inquiry' | 'sourceReport' | 'qobooliReport' | 'absent' | 'applicant'
 type Source = 'qobool' | 'direct'
 type Status =
   | 'غير محدد'
@@ -153,6 +160,7 @@ const collegeManagers: CollegeManager[] = [
 ]
 
 const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: 'dashboard', label: 'داشبورد متقدم', icon: LineChart },
   { id: 'college', label: 'إدارة الكلية', icon: LayoutDashboard },
   { id: 'trainees', label: 'شؤون المتدربين', icon: ClipboardCheck },
   { id: 'head', label: 'رئيس القسم', icon: GraduationCap },
@@ -166,6 +174,7 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
 const roleIds = roles.map((item) => item.id)
 
 const roleDescriptions: Record<Role, string> = {
+  dashboard: 'لوحة مؤسسية قابلة للتخصيص تجمع المؤشرات والتنبيهات والتحليلات وجدول المتابعة.',
   college: 'نظرة تنفيذية على سير المقابلات، نسب الإنجاز، والنتائج المعتمدة.',
   trainees: 'مراجعة الطلبات والوثائق وإصدار أرقام الانتظار للمتقدمين.',
   head: 'توزيع المتقدمين على اللجان واعتماد النتائج النهائية.',
@@ -387,6 +396,8 @@ const emptyApplicantForm: ApplicantForm = {
 }
 
 const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
+const dashboardWidgetOrder = ['summary', 'analytics', 'alerts', 'table', 'actions', 'api'] as const
+type DashboardWidgetId = typeof dashboardWidgetOrder[number]
 const maxConcurrentUsers = 150
 const noShowStatus: Status = 'معتذر أو لم يحضر'
 
@@ -396,6 +407,30 @@ const fullInterviewScore = 50
 const exportHeaders = ['الاسم', 'رقم الهوية', 'الجنسية', 'العمر', 'نوع الشهادة', 'سنة التخرج', 'رقم الجوال', 'رقم جوال إضافي', 'حالة القبول', 'المصدر', 'الحالة', 'رقم المقابلة', 'موعد المقابلة', 'النتيجة', 'الإشارة من 25', 'المظهر العام من 5', 'معلومات عامة من 15', 'سرعة الاستجابة من 5', 'الدرجة الكاملة', 'المجموع', 'عدد المسجلين من البوابة وحضروا المقابلة', 'عدد الذين لم يحضروا المقابلة', 'عدد المسجلين بشكل مباشر', 'صعوبة أو إعاقة مصاحبة', 'ضعيف سمع', 'يتقن لغة الإشارة', 'ضعف عام بالقدرات العقلية والاستيعاب', 'متقدم متميز', 'أسئلة الرياضيات', 'أسئلة الإنجليزي', 'ملاحظات']
 const qobooliReportHeaders = ['رقم الهوية', 'الاسم في منصة قبولي', 'الاسم في النظام', 'حالة المطابقة', 'حالة الحضور', 'رقم الجوال', 'التخصص', 'رقم الرغبة', 'حالة القبول', 'الحالة في النظام', 'رقم الانتظار', 'الدرجة الكاملة', 'الدرجة', 'الملاحظات', 'المصدر']
 let fallbackSessionId = ''
+const memoryStorage = new Map<string, string>()
+
+function safeStorageGet(key: string) {
+  try {
+    const storage = window.localStorage
+    if (typeof storage?.getItem === 'function') return storage.getItem(key)
+  } catch {
+    return memoryStorage.get(key) ?? null
+  }
+  return memoryStorage.get(key) ?? null
+}
+
+function safeStorageSet(key: string, value: string) {
+  try {
+    const storage = window.localStorage
+    if (typeof storage?.setItem === 'function') {
+      storage.setItem(key, value)
+      return
+    }
+  } catch {
+    // Fall back to in-memory storage for restricted browsers and tests.
+  }
+  memoryStorage.set(key, value)
+}
 
 function sessionId() {
   const storageKey = 'interview-3-session-id'
@@ -1445,6 +1480,7 @@ function App() {
           </>
         )}
 
+        {role === 'dashboard' && <EnterpriseDashboardView applicants={applicants} stats={stats} navigateRole={navigateRole} refreshApplicants={refreshApplicants} />}
         {role === 'college' && <CollegeView applicants={applicants} stats={stats} />}
         {role === 'trainees' && (
           <OperationsView
@@ -1506,6 +1542,10 @@ function yesNoCounts(applicants: Applicant[], selector: (scores: ReturnType<type
   const yes = answered.filter((value) => value === 'نعم').length
   const no = answered.length - yes
   return { yes, no, total: answered.length }
+}
+
+function percent(part: number, total: number) {
+  return total ? Math.round((part / total) * 100) : 0
 }
 
 export function computeVisualAnalytics(applicants: Applicant[]) {
@@ -1660,6 +1700,252 @@ function YesNoSummaryCard({ title, items }: { title: string; items: { label: str
         })}
       </div>
     </article>
+  )
+}
+
+function DashboardLineChart({ title, data }: { title: string; data: ChartDatum[] }) {
+  const max = Math.max(...data.map((item) => item.value), 1)
+  const points = data.map((item, index) => {
+    const x = data.length === 1 ? 90 : 16 + (index / (data.length - 1)) * 168
+    const y = 96 - (item.value / max) * 70
+    return { ...item, x, y }
+  })
+  return (
+    <article className="chart-card">
+      <h3>{title}</h3>
+      <svg className="dashboard-line-chart" role="img" aria-label={title} viewBox="0 0 200 118">
+        <path d="M16 96H184" />
+        <path d="M16 24V96" />
+        <polyline points={points.map((point) => `${point.x},${point.y}`).join(' ')} />
+        {points.map((point) => (
+          <g key={point.label}>
+            <circle cx={point.x} cy={point.y} r="4" />
+            <title>{point.label}: {point.value}</title>
+          </g>
+        ))}
+      </svg>
+      <div className="chart-legend compact">
+        {data.map((item) => <span key={item.label}><i style={{ background: item.color }} /> {item.label}: {item.value}</span>)}
+      </div>
+    </article>
+  )
+}
+
+function HeatmapCard({ applicants }: { applicants: Applicant[] }) {
+  const buckets = committees.map((committee) => {
+    const committeeApplicants = applicants.filter((applicant) => applicant.committeeNumber === committee.number || applicant.committeeId === committee.id)
+    return {
+      label: `لجنة ${committee.number}`,
+      waiting: committeeApplicants.filter((applicant) => applicant.status === 'بانتظار المقابلة').length,
+      evaluated: committeeApplicants.filter((applicant) => applicant.status === 'تم التقييم' || applicant.status === 'النتيجة معتمدة').length,
+      noShow: committeeApplicants.filter((applicant) => applicant.status === noShowStatus).length,
+    }
+  })
+  const max = Math.max(...buckets.flatMap((item) => [item.waiting, item.evaluated, item.noShow]), 1)
+  const columns = [
+    { key: 'waiting', label: 'بانتظار' },
+    { key: 'evaluated', label: 'مقابلة' },
+    { key: 'noShow', label: 'لم يحضر' },
+  ] as const
+  return (
+    <article className="chart-card">
+      <h3>خريطة حرارة اللجان</h3>
+      <div className="heatmap" role="table" aria-label="خريطة حرارة اللجان">
+        <span />
+        {columns.map((column) => <strong key={column.key}>{column.label}</strong>)}
+        {buckets.map((row) => (
+          <Fragment key={row.label}>
+            <b key={`${row.label}-label`}>{row.label}</b>
+            {columns.map((column) => {
+              const value = row[column.key]
+              return <i key={`${row.label}-${column.key}`} style={{ '--heat': `${Math.max(0.12, value / max)}` } as CSSProperties}>{value}</i>
+            })}
+          </Fragment>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function EnterpriseDashboardView({ applicants, stats, navigateRole, refreshApplicants }: {
+  applicants: Applicant[]
+  stats: { total: number; approved: number; pendingDocs: number; interviewed: number; scheduled: number; portalAttended: number; portalNoShows: number; directApplicants: number }
+  navigateRole: (nextRole: Role) => void
+  refreshApplicants: () => Promise<void>
+}) {
+  const [widgetOrder, setWidgetOrder] = useState<DashboardWidgetId[]>(() => {
+    try {
+      const saved = safeStorageGet('interview-3-dashboard-order')
+      const parsed = saved ? JSON.parse(saved) as DashboardWidgetId[] : []
+      const valid = parsed.filter((item): item is DashboardWidgetId => dashboardWidgetOrder.includes(item))
+      return valid.length === dashboardWidgetOrder.length ? valid : [...dashboardWidgetOrder]
+    } catch {
+      return [...dashboardWidgetOrder]
+    }
+  })
+  const [draggedWidget, setDraggedWidget] = useState<DashboardWidgetId | null>(null)
+  const [darkMode, setDarkMode] = useState(() => safeStorageGet('interview-3-dashboard-theme') === 'dark')
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all')
+  const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all')
+  const [sortKey, setSortKey] = useState<'name' | 'status' | 'score' | 'source'>('score')
+  const [syncMessage, setSyncMessage] = useState('متصل بواجهة البيانات المحلية')
+  const analytics = computeVisualAnalytics(applicants)
+  const uniqueStatuses = Array.from(new Set(applicants.map((applicant) => applicant.status)))
+  const normalizedQuery = normalizeDigits(query).trim().toLowerCase()
+  const filteredApplicants = applicants
+    .filter((applicant) => statusFilter === 'all' || applicant.status === statusFilter)
+    .filter((applicant) => sourceFilter === 'all' || applicant.source === sourceFilter)
+    .filter((applicant) => !normalizedQuery || [applicant.name, applicant.nationalId, applicant.waitingNo ?? '', applicant.phone].some((value) => normalizeDigits(value).toLowerCase().includes(normalizedQuery)))
+    .sort((a, b) => {
+      if (sortKey === 'score') return calculateScore(b) - calculateScore(a)
+      if (sortKey === 'source') return registrationSourceLabel(a.source).localeCompare(registrationSourceLabel(b.source), 'ar')
+      return String(a[sortKey]).localeCompare(String(b[sortKey]), 'ar')
+    })
+  const recentApplicants = filteredApplicants.slice(0, 18)
+  const alerts = [
+    { label: 'مسجلون من البوابة ولم يحضروا', value: stats.portalNoShows, tone: 'danger' },
+    { label: 'طلبات تحتاج مراجعة', value: stats.pendingDocs, tone: 'warning' },
+    { label: 'غير موزعين على لجنة', value: applicants.filter((applicant) => !applicant.committeeNumber && !applicant.committeeId).length, tone: 'info' },
+  ]
+  const saveOrder = (nextOrder: DashboardWidgetId[]) => {
+    setWidgetOrder(nextOrder)
+    safeStorageSet('interview-3-dashboard-order', JSON.stringify(nextOrder))
+  }
+  const moveWidget = (target: DashboardWidgetId) => {
+    if (!draggedWidget || draggedWidget === target) return
+    const nextOrder = widgetOrder.filter((item) => item !== draggedWidget)
+    nextOrder.splice(nextOrder.indexOf(target), 0, draggedWidget)
+    saveOrder(nextOrder)
+  }
+  const toggleTheme = () => {
+    const next = !darkMode
+    setDarkMode(next)
+    safeStorageSet('interview-3-dashboard-theme', next ? 'dark' : 'light')
+  }
+  const handleRefresh = async () => {
+    setSyncMessage('جاري المزامنة...')
+    try {
+      await refreshApplicants()
+      setSyncMessage(`آخر مزامنة: ${new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}`)
+    } catch {
+      setSyncMessage('تعذرت المزامنة، البيانات المحلية ظاهرة الآن')
+    }
+  }
+  const widgets: Record<DashboardWidgetId, ReactElement> = {
+    summary: (
+      <section className="dashboard-section" aria-label="ملخص تنفيذي">
+        <div className="section-title"><h2>ملخص تنفيذي</h2><Sparkles size={21} /></div>
+        <div className="dashboard-kpis">
+          <Metric icon={Users} label="إجمالي المتقدمين" value={stats.total} tone="blue" />
+          <Metric icon={CalendarDays} label="جاهزية الجدولة" value={percent(stats.scheduled, stats.total)} tone="teal" />
+          <Metric icon={CheckCircle2} label="إنجاز المقابلات" value={percent(stats.interviewed, stats.total)} tone="green" />
+          <Metric icon={Clock3} label="لم يحضروا" value={stats.portalNoShows} tone="danger" />
+        </div>
+      </section>
+    ),
+    analytics: (
+      <section className="dashboard-section" aria-label="تحليلات مرئية">
+        <div className="section-title"><h2>تحليلات مرئية</h2><BarChart3 size={21} /></div>
+        <div className="visual-grid visual-grid-wide">
+          <DashboardLineChart title="مسار الحالات" data={analytics.status.slice(0, 6)} />
+          <DonutChartCard title="توزيع النتائج" data={analytics.results} />
+          <HeatmapCard applicants={applicants} />
+          <BarChartCard title="توزيع اللجان" data={analytics.committees} />
+          <ScoreBarsCard title="متوسطات التقييم" scores={analytics.scores} />
+          <YesNoSummaryCard title="مؤشرات نعم / لا" items={analytics.yesNo} />
+        </div>
+      </section>
+    ),
+    alerts: (
+      <section className="dashboard-section" aria-label="التنبيهات">
+        <div className="section-title"><h2>التنبيهات</h2><ShieldCheck size={21} /></div>
+        <div className="alert-grid">
+          {alerts.map((alert) => (
+            <article className={`dashboard-alert ${alert.tone}`} key={alert.label}>
+              <strong>{alert.value}</strong>
+              <span>{alert.label}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+    ),
+    table: (
+      <section className="dashboard-section" aria-label="جدول بيانات قابل للفرز والفلترة">
+        <div className="section-title"><h2>جدول المتابعة الذكي</h2><Database size={21} /></div>
+        <div className="dashboard-filters">
+          <label><Search size={16} />بحث<input aria-label="بحث الداشبورد" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="الاسم، الهوية، الجوال" /></label>
+          <label><Filter size={16} />الحالة<select aria-label="فلتر الحالة" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as Status | 'all')}><option value="all">كل الحالات</option>{uniqueStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></label>
+          <label>المصدر<select aria-label="فلتر المصدر" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as Source | 'all')}><option value="all">كل المصادر</option><option value="qobool">منصة قبولي</option><option value="direct">مباشر</option></select></label>
+          <label>الفرز<select aria-label="فرز الداشبورد" value={sortKey} onChange={(event) => setSortKey(event.target.value as typeof sortKey)}><option value="score">الأعلى درجة</option><option value="name">الاسم</option><option value="status">الحالة</option><option value="source">المصدر</option></select></label>
+        </div>
+        <div className="table-wrap dashboard-table">
+          <table>
+            <thead><tr><th>المتقدم</th><th>الهوية</th><th>المصدر</th><th>الحالة</th><th>اللجنة</th><th>المجموع</th><th>رقم الانتظار</th></tr></thead>
+            <tbody>
+              {recentApplicants.map((applicant) => <tr key={applicant.id}><td>{applicant.name}</td><td>{applicant.nationalId}</td><td>{registrationSourceLabel(applicant.source)}</td><td><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td><td>{applicant.committeeNumber ? `لجنة ${applicant.committeeNumber}` : 'غير موزع'}</td><td>{calculateScore(applicant)} / 50</td><td>{applicant.waitingNo ?? 'لم يصدر'}</td></tr>)}
+              {recentApplicants.length === 0 && <tr><td className="empty-table" colSpan={7}>لا توجد بيانات مطابقة.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ),
+    actions: (
+      <section className="dashboard-section" aria-label="إجراءات سريعة">
+        <div className="section-title"><h2>إجراءات سريعة</h2><ListChecks size={21} /></div>
+        <div className="quick-card-grid">
+          <button onClick={() => navigateRole('trainees')} type="button"><ClipboardCheck size={18} />شؤون المتدربين</button>
+          <button onClick={() => navigateRole('committee')} type="button"><UserCheck size={18} />بدء مقابلة</button>
+          <button onClick={() => navigateRole('qobooliReport')} type="button"><FileText size={18} />تقرير قبولي</button>
+          <button onClick={() => void handleRefresh()} type="button"><RefreshCcw size={18} />مزامنة</button>
+        </div>
+        <p className="report-note">{syncMessage}</p>
+      </section>
+    ),
+    api: (
+      <section className="dashboard-section" aria-label="عقود API والأمن">
+        <div className="section-title"><h2>عقود API والأمن</h2><ShieldCheck size={21} /></div>
+        <div className="api-contract-grid">
+          <code>GET /api/applicants {'{ applicants: Applicant[] }'}</code>
+          <code>PATCH /api/applicants/:id {'{ patch, audit }'}</code>
+          <code>POST /api/session {'{ active, max: 150 }'}</code>
+          <code>SSE /api/events {'{ type, applicantId, changedAt }'}</code>
+        </div>
+        <div className="security-list">
+          <span>RBAC حسب الواجهات الداخلية</span>
+          <span>سجل تدقيق داخل كل متقدم</span>
+          <span>تعقيم مدخلات React افتراضيًا ضد XSS</span>
+          <span>تجهيز CSRF token عند نقلها لخادم كامل</span>
+        </div>
+      </section>
+    ),
+  }
+  return (
+    <section className={`enterprise-dashboard ${darkMode ? 'dark' : ''}`}>
+      <div className="dashboard-commandbar">
+        <div>
+          <strong>داشبورد مؤسسي قابل للتخصيص</strong>
+          <span>Grid مرن، فلاتر، مخططات SVG، وحفظ تفضيلات المستخدم محليًا.</span>
+        </div>
+        <button onClick={toggleTheme} type="button">{darkMode ? <Sun size={17} /> : <Moon size={17} />}{darkMode ? 'فاتح' : 'داكن'}</button>
+      </div>
+      <div className="dashboard-grid">
+        {widgetOrder.map((widgetId) => (
+          <article
+            className={`dashboard-widget ${widgetId}`}
+            draggable
+            key={widgetId}
+            onDragEnd={() => setDraggedWidget(null)}
+            onDragOver={(event) => event.preventDefault()}
+            onDragStart={() => setDraggedWidget(widgetId)}
+            onDrop={() => moveWidget(widgetId)}
+          >
+            <div className="widget-handle" aria-label="سحب وإعادة ترتيب"><GripVertical size={17} /> اسحب لترتيب القسم</div>
+            {widgets[widgetId]}
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 
