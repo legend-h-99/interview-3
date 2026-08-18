@@ -396,7 +396,7 @@ const emptyApplicantForm: ApplicantForm = {
 }
 
 const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
-const dashboardWidgetOrder = ['summary', 'analytics', 'alerts', 'table', 'actions', 'api'] as const
+const dashboardWidgetOrder = ['summary', 'analytics', 'alerts', 'table', 'actions'] as const
 type DashboardWidgetId = typeof dashboardWidgetOrder[number]
 const maxConcurrentUsers = 150
 const noShowStatus: Status = 'معتذر أو لم يحضر'
@@ -1910,23 +1910,6 @@ function EnterpriseDashboardView({ applicants, stats, navigateRole, refreshAppli
           <button onClick={() => void handleRefresh()} type="button"><RefreshCcw size={18} />مزامنة</button>
         </div>
         <p className="report-note">{syncMessage}</p>
-      </section>
-    ),
-    api: (
-      <section className="dashboard-section" aria-label="عقود API والأمن">
-        <div className="section-title"><h2>عقود API والأمن</h2><ShieldCheck size={21} /></div>
-        <div className="api-contract-grid">
-          <code>GET /api/applicants {'{ applicants: Applicant[] }'}</code>
-          <code>PATCH /api/applicants/:id {'{ patch, audit }'}</code>
-          <code>POST /api/session {'{ active, max: 150 }'}</code>
-          <code>SSE /api/events {'{ type, applicantId, changedAt }'}</code>
-        </div>
-        <div className="security-list">
-          <span>RBAC حسب الواجهات الداخلية</span>
-          <span>سجل تدقيق داخل كل متقدم</span>
-          <span>تعقيم مدخلات React افتراضيًا ضد XSS</span>
-          <span>تجهيز CSRF token عند نقلها لخادم كامل</span>
-        </div>
       </section>
     ),
   }

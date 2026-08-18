@@ -681,9 +681,7 @@ button svg,
 
 .dashboard-kpis,
 .alert-grid,
-.quick-card-grid,
-.api-contract-grid,
-.security-list {
+.quick-card-grid {
   display: grid;
   gap: 10px;
 }
@@ -805,34 +803,6 @@ button svg,
 
 .quick-card-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.api-contract-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.api-contract-grid code,
-.security-list span {
-  padding: 10px;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  direction: ltr;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.security-list {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 10px;
-}
-
-.security-list span {
-  direction: rtl;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .insight-strip {
@@ -1707,9 +1677,7 @@ textarea:focus {
 
   .dashboard-kpis,
   .dashboard-filters,
-  .quick-card-grid,
-  .api-contract-grid,
-  .security-list {
+  .quick-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1784,8 +1752,6 @@ textarea:focus {
   .dashboard-kpis,
   .dashboard-filters,
   .quick-card-grid,
-  .api-contract-grid,
-  .security-list,
   .visual-grid,
   .visual-grid-wide,
   .detail-grid,

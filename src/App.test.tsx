@@ -193,7 +193,7 @@ describe('Interview management system', () => {
     expect(screen.getByRole('heading', { name: 'ملخص تنفيذي' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'تحليلات مرئية' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'جدول المتابعة الذكي' })).toBeTruthy()
-    expect(screen.getByText('GET /api/applicants { applicants: Applicant[] }')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'عقود API والأمن' })).toBeNull()
 
     await user.type(screen.getByLabelText('بحث الداشبورد'), 'سالم عبدالله بن محمد')
     expect(screen.getByText('سالم عبدالله بن محمد')).toBeTruthy()
