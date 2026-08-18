@@ -1883,7 +1883,17 @@ function EnterpriseDashboardView({ applicants, stats, navigateRole, refreshAppli
           <table>
             <thead><tr><th>المتقدم</th><th>الهوية</th><th>المصدر</th><th>الحالة</th><th>اللجنة</th><th>المجموع</th><th>رقم الانتظار</th></tr></thead>
             <tbody>
-              {recentApplicants.map((applicant) => <tr key={applicant.id}><td>{applicant.name}</td><td>{applicant.nationalId}</td><td>{registrationSourceLabel(applicant.source)}</td><td><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td><td>{applicant.committeeNumber ? `لجنة ${applicant.committeeNumber}` : 'غير موزع'}</td><td>{calculateScore(applicant)} / 50</td><td>{applicant.waitingNo ?? 'لم يصدر'}</td></tr>)}
+              {recentApplicants.map((applicant) => (
+                <tr key={applicant.id}>
+                  <td data-label="المتقدم">{applicant.name}</td>
+                  <td data-label="الهوية">{applicant.nationalId}</td>
+                  <td data-label="المصدر">{registrationSourceLabel(applicant.source)}</td>
+                  <td data-label="الحالة"><span className={`status ${statusTone(applicant.status)}`}>{applicant.status}</span></td>
+                  <td data-label="اللجنة">{applicant.committeeNumber ? `لجنة ${applicant.committeeNumber}` : 'غير موزع'}</td>
+                  <td data-label="المجموع">{calculateScore(applicant)} / 50</td>
+                  <td data-label="رقم الانتظار">{applicant.waitingNo ?? 'لم يصدر'}</td>
+                </tr>
+              ))}
               {recentApplicants.length === 0 && <tr><td className="empty-table" colSpan={7}>لا توجد بيانات مطابقة.</td></tr>}
             </tbody>
           </table>
