@@ -160,7 +160,6 @@ const collegeManagers: CollegeManager[] = [
 ]
 
 const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'dashboard', label: 'داشبورد متقدم', icon: LineChart },
   { id: 'college', label: 'إدارة الكلية', icon: LayoutDashboard },
   { id: 'trainees', label: 'شؤون المتدربين', icon: ClipboardCheck },
   { id: 'head', label: 'رئيس القسم', icon: GraduationCap },
@@ -170,6 +169,7 @@ const roles: { id: Role; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'qobooliReport', label: 'تقرير منصة قبولي', icon: FileText },
   { id: 'absent', label: 'لم يحضروا المقابلة', icon: Clock3 },
   { id: 'applicant', label: 'واجهة المتقدم', icon: QrCode },
+  { id: 'dashboard', label: 'داشبورد متقدم', icon: LineChart },
 ]
 const roleIds = roles.map((item) => item.id)
 
