@@ -1428,8 +1428,8 @@ function App() {
             <p>interview 3 / وحدة القبول والمقابلات</p>
             <h1>{applicantOnly ? 'بوابة المتقدمين' : roles.find((item) => item.id === role)?.label}</h1>
             <span className="institution-line">{collegeProfile.collegeName} · {collegeProfile.departmentName}</span>
-            <span className="institution-line">رئيس القسم / رئيس اللجنة: {collegeProfile.departmentHeadAndCommitteeChair}</span>
-            <span className="institution-line">الحد الأقصى للاستخدام المتزامن: {capacityState.max} مستخدم</span>
+            {!applicantOnly && <span className="institution-line">رئيس القسم / رئيس اللجنة: {collegeProfile.departmentHeadAndCommitteeChair}</span>}
+            {!applicantOnly && <span className="institution-line">الحد الأقصى للاستخدام المتزامن: {capacityState.max} مستخدم</span>}
             <span className="topbar-description">{roleDescriptions[activeRole]}</span>
           </div>
           {!applicantOnly && <div className="quick-actions">
@@ -1441,11 +1441,11 @@ function App() {
                 </select>
               </label>
             )}
-            <button onClick={() => exportApplicantsXlsx(applicants, selectedManager)} type="button"><Download size={17} /> XLSX</button>
-            <button onClick={() => exportApplicantsCsv(applicants, selectedManager)} type="button"><Download size={17} /> CSV</button>
-            <button onClick={() => void exportApplicantsPptx(applicants, selectedManager)} type="button"><BarChart3 size={17} /> PPTX</button>
-            <button onClick={() => openApplicantsPdfReport(applicants, stats, selectedManager)} type="button"><FileText size={17} /> PDF</button>
-            <button onClick={() => refreshApplicants()} type="button"><RefreshCcw size={17} /> مزامنة البيانات</button>
+            <button className="utility-action" onClick={() => exportApplicantsXlsx(applicants, selectedManager)} type="button"><Download size={17} /> XLSX</button>
+            <button className="utility-action" onClick={() => exportApplicantsCsv(applicants, selectedManager)} type="button"><Download size={17} /> CSV</button>
+            <button className="utility-action" onClick={() => void exportApplicantsPptx(applicants, selectedManager)} type="button"><BarChart3 size={17} /> PPTX</button>
+            <button className="utility-action" onClick={() => openApplicantsPdfReport(applicants, stats, selectedManager)} type="button"><FileText size={17} /> PDF</button>
+            <button className="sync-action" onClick={() => refreshApplicants()} type="button"><RefreshCcw size={17} /> مزامنة البيانات</button>
           </div>}
         </header>
 
@@ -1460,7 +1460,7 @@ function App() {
               <Metric icon={Clock3} label="من البوابة ولم يحضروا" value={stats.portalNoShows} tone="danger" />
               <Metric icon={QrCode} label="مسجل مباشر" value={stats.directApplicants} tone="blue" />
             </section>
-            <section className="insight-strip" aria-label="ملخص سريع">
+            {role !== 'dashboard' && <section className="insight-strip" aria-label="ملخص سريع">
               <div>
                 <Sparkles size={18} />
                 <span>جاهزية المقابلات</span>
@@ -1476,7 +1476,7 @@ function App() {
                 <span>آخر ملف محدد</span>
                 <strong>{selected.requestNo}</strong>
               </div>
-            </section>
+            </section>}
           </>
         )}
 
@@ -2005,32 +2005,37 @@ function Details({ applicant, hideInterviewPageSections = false }: { applicant: 
         </div>
         <strong>{applicant.waitingNo ? `رقم المقابلة ${applicant.waitingNo}` : 'بدون رقم مقابلة'}</strong>
       </div>
-      <div className="detail-grid">
+      <div className={`detail-grid ${hideInterviewPageSections ? 'interview-summary-grid' : ''}`}>
         <Info label="رقم الهوية" value={applicant.nationalId} />
-        <Info label="الجنسية" value={applicant.nationality} />
-        <Info label="العمر" value={`${applicant.age}`} />
-        <Info label="نوع الشهادة" value={applicant.certificateType} />
-        <Info label="سنة التخرج" value={graduationYearOnly(applicant.graduationDate)} />
-        <Info label="رقم الجوال" value={applicant.phone} />
-        <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
         <Info label="المصدر" value={registrationSourceLabel(applicant.source)} />
-        {applicant.admissionStatus && <Info label="حالة القبول" value={applicant.admissionStatus} />}
-        {applicant.program && <Info label="البرنامج" value={applicant.program} />}
         <Info label="حالة الطلب" value={`الحالة الحالية: ${applicant.status}`} />
         <Info label="اللجنة" value={committeeNumber ? `لجنة ${committeeNumber}` : 'غير موزع'} />
-        <Info label="المدربون" value={trainers || 'لم يتم الاختيار'} />
-        <Info label="المترجم" value={translator ?? 'بدون مترجم'} />
-        <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
+        {hideInterviewPageSections && <Info label="رقم الجوال" value={applicant.phone} />}
         <Info label="التقييم الشامل" value={`${calculateScore(applicant)} من 50`} />
-        <Info label="الإشارة" value={`${scores.signLanguage} من 25`} />
-        <Info label="المظهر العام" value={`${scores.appearance} من 5`} />
-        <Info label="معلومات عامة" value={`${scores.generalInfo} من 15`} />
-        <Info label="سرعة الاستجابة للتعليمات" value={`${scores.responseSpeed} من 5`} />
-        <Info label="صعوبة أو إعاقة مصاحبة" value={scores.hasAssociatedDifficulty || 'لم يحدد'} />
-        <Info label="ضعيف سمع" value={scores.weakHearing || 'لم يحدد'} />
-        <Info label="يتقن لغة الإشارة" value={scores.knowsSignLanguage || 'لم يحدد'} />
-        <Info label="ضعف عام بالقدرات العقلية والاستيعاب" value={scores.weakMentalAbilities || 'لم يحدد'} />
-        <Info label="متقدم متميز" value={scores.distinguished || 'لم يحدد'} />
+        {!hideInterviewPageSections && (
+          <>
+            <Info label="الجنسية" value={applicant.nationality} />
+            <Info label="العمر" value={`${applicant.age}`} />
+            <Info label="نوع الشهادة" value={applicant.certificateType} />
+            <Info label="سنة التخرج" value={graduationYearOnly(applicant.graduationDate)} />
+            <Info label="رقم الجوال" value={applicant.phone} />
+            <Info label="رقم جوال إضافي" value={applicant.extraPhone} />
+            {applicant.admissionStatus && <Info label="حالة القبول" value={applicant.admissionStatus} />}
+            {applicant.program && <Info label="البرنامج" value={applicant.program} />}
+            <Info label="المدربون" value={trainers || 'لم يتم الاختيار'} />
+            <Info label="المترجم" value={translator ?? 'بدون مترجم'} />
+            <Info label="موعد المقابلة" value={applicant.interviewAt ?? 'غير مجدول'} />
+            <Info label="الإشارة" value={`${scores.signLanguage} من 25`} />
+            <Info label="المظهر العام" value={`${scores.appearance} من 5`} />
+            <Info label="معلومات عامة" value={`${scores.generalInfo} من 15`} />
+            <Info label="سرعة الاستجابة للتعليمات" value={`${scores.responseSpeed} من 5`} />
+            <Info label="صعوبة أو إعاقة مصاحبة" value={scores.hasAssociatedDifficulty || 'لم يحدد'} />
+            <Info label="ضعيف سمع" value={scores.weakHearing || 'لم يحدد'} />
+            <Info label="يتقن لغة الإشارة" value={scores.knowsSignLanguage || 'لم يحدد'} />
+            <Info label="ضعف عام بالقدرات العقلية والاستيعاب" value={scores.weakMentalAbilities || 'لم يحدد'} />
+            <Info label="متقدم متميز" value={scores.distinguished || 'لم يحدد'} />
+          </>
+        )}
       </div>
       {!hideInterviewPageSections && (
         <>

@@ -206,6 +206,19 @@ button svg,
   padding-top: 4px;
 }
 
+.quick-actions .utility-action {
+  color: var(--color-action-primary);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  box-shadow: none;
+}
+
+.quick-actions .sync-action {
+  color: var(--color-text-primary);
+  background: #e8eef5;
+  box-shadow: none;
+}
+
 .manager-select {
   display: grid;
   gap: 5px;
@@ -651,6 +664,7 @@ button svg,
 }
 
 .dashboard-widget.analytics,
+.dashboard-widget.summary,
 .dashboard-widget.table {
   grid-column: 1 / -1;
 }
@@ -688,6 +702,10 @@ button svg,
 
 .dashboard-kpis {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard-kpis .metric {
+  min-height: 74px;
 }
 
 .dashboard-line-chart {
@@ -1503,6 +1521,10 @@ textarea:focus {
   overflow: hidden;
 }
 
+.interview-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .applicant-hero span,
 .applicant-hero p {
   color: rgb(255 255 255 / 0.78);
@@ -1722,6 +1744,12 @@ textarea:focus {
     font-size: 25px;
   }
 
+  .institution-line {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
   .topbar-description {
     max-width: none;
   }
@@ -1784,6 +1812,20 @@ textarea:focus {
     grid-template-columns: 58px repeat(3, minmax(0, 1fr));
   }
 
+  .grid.split {
+    gap: 10px;
+  }
+
+  .interview-summary-grid .info {
+    min-height: 56px;
+  }
+
+  .choice-block,
+  .inline-editor,
+  .score-form {
+    gap: 10px;
+  }
+
   .profile-header,
   .applicant-hero {
     grid-template-columns: 1fr;
@@ -1824,12 +1866,38 @@ textarea:focus {
     width: 100%;
   }
 
-  .hero-badge {
-    min-width: 0;
+  .applicant-shell {
+    max-width: 100%;
+  }
+
+  .applicant-hero {
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .applicant-hero span {
+    font-size: 12px;
   }
 
   .applicant-hero h2 {
-    font-size: 25px;
+    margin-top: 4px;
+    font-size: 24px;
+  }
+
+  .applicant-hero p {
+    margin-top: 8px;
+    line-height: 1.65;
+  }
+
+  .hero-badge,
+  .qr-box {
+    display: none;
+  }
+
+  .applicant-card {
+    gap: 12px;
   }
 
   .panel {
