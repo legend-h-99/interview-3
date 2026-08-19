@@ -395,7 +395,7 @@ const emptyApplicantForm: ApplicantForm = {
   extraPhone: '',
 }
 
-const chartColors = ['#0f6b8f', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
+const chartColors = ['#1564ab', '#0f766e', '#b7791f', '#64748b', '#8b5cf6', '#dc2626']
 const dashboardWidgetOrder = ['summary', 'analytics', 'alerts', 'table', 'actions'] as const
 type DashboardWidgetId = typeof dashboardWidgetOrder[number]
 const maxConcurrentUsers = 150
