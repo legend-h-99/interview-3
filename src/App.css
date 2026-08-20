@@ -30,9 +30,10 @@
   height: 100vh;
   padding: 20px 16px 16px;
   background:
-    linear-gradient(180deg, rgb(21 100 171 / 0.18), transparent 32%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.55), transparent 32%),
     var(--color-bg-sidebar);
-  color: var(--color-text-inverse);
+  border-inline-end: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -59,7 +60,7 @@
 .brand {
   gap: 12px;
   padding: 0 4px 16px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.14);
+  border-bottom: 1px solid var(--color-border-default);
 }
 
 .brand strong,
@@ -73,7 +74,7 @@
 }
 
 .brand span {
-  color: #aac3de;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -115,7 +116,7 @@ button svg,
   align-items: center;
   gap: 10px;
   padding: 11px 12px;
-  color: #c8def2;
+  color: var(--color-text-secondary);
   background: transparent;
   text-align: start;
   white-space: normal;
@@ -128,18 +129,19 @@ button svg,
 .sidebar nav button.active {
   color: var(--color-text-inverse);
   background: var(--color-action-primary);
-  box-shadow: inset 3px 0 0 rgb(255 255 255 / 0.55);
+  box-shadow: inset 3px 0 0 rgb(21 100 171 / 0.4);
 }
 
 .sidebar nav button:hover,
 .ghost:hover {
-  background: rgb(255 255 255 / 0.08);
+  background: rgb(21 100 171 / 0.08);
   transform: translateX(-2px);
 }
 
 .ghost {
   margin-top: auto;
-  border: 1px solid rgb(255 255 255 / 0.18);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
 }
 
 .workspace {
@@ -1513,9 +1515,9 @@ textarea:focus {
   padding: clamp(18px, 3vw, 30px);
   border: 1px solid rgb(21 100 171 / 0.16);
   border-radius: var(--radius-lg);
-  color: var(--color-text-inverse);
+  color: var(--color-text-primary);
   background:
-    linear-gradient(135deg, rgb(27 58 107 / 0.96), rgb(21 100 171 / 0.88)),
+    linear-gradient(135deg, rgb(21 100 171 / 0.12), rgb(5 130 120 / 0.06)),
     var(--color-bg-sidebar);
   box-shadow: var(--shadow-lifted);
   overflow: hidden;
@@ -1527,7 +1529,7 @@ textarea:focus {
 
 .applicant-hero span,
 .applicant-hero p {
-  color: rgb(255 255 255 / 0.78);
+  color: var(--color-text-secondary);
 }
 
 .applicant-hero span {
@@ -1558,9 +1560,10 @@ textarea:focus {
   place-items: center;
   min-width: 150px;
   padding: 18px;
-  border: 1px solid rgb(255 255 255 / 0.2);
+  border: 1px solid rgb(21 100 171 / 0.2);
   border-radius: var(--radius-lg);
-  background: rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.55);
+  color: var(--color-action-primary);
 }
 
 .hero-badge strong {
