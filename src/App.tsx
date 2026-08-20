@@ -1449,38 +1449,7 @@ function App() {
           </div>}
         </header>
 
-        {!applicantOnly && role !== 'applicant' && (
-          <>
-            <section className="metrics" aria-label="مؤشرات النظام">
-              <Metric icon={Users} label="إجمالي المتقدمين" value={stats.total} tone="blue" />
-              <Metric icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} tone="amber" />
-              <Metric icon={CalendarDays} label="مواعيد مجدولة" value={stats.scheduled} tone="teal" />
-              <Metric icon={CheckCircle2} label="نتائج معتمدة" value={stats.approved} tone="green" />
-              <Metric icon={UserCheck} label="من البوابة وحضروا" value={stats.portalAttended} tone="green" />
-              <Metric icon={Clock3} label="من البوابة ولم يحضروا" value={stats.portalNoShows} tone="danger" />
-              <Metric icon={QrCode} label="مسجل مباشر" value={stats.directApplicants} tone="blue" />
-            </section>
-            {role !== 'dashboard' && <section className="insight-strip" aria-label="ملخص سريع">
-              <div>
-                <Sparkles size={18} />
-                <span>جاهزية المقابلات</span>
-                <strong>{stats.total ? Math.round((stats.scheduled / stats.total) * 100) : 0}%</strong>
-              </div>
-              <div>
-                <Clock3 size={18} />
-                <span>تحتاج متابعة</span>
-                <strong>{stats.pendingDocs}</strong>
-              </div>
-              <div>
-                <ShieldCheck size={18} />
-                <span>آخر ملف محدد</span>
-                <strong>{selected.requestNo}</strong>
-              </div>
-            </section>}
-          </>
-        )}
-
-        {role === 'dashboard' && <EnterpriseDashboardView applicants={applicants} stats={stats} navigateRole={navigateRole} refreshApplicants={refreshApplicants} />}
+        {role === 'dashboard' && <EnterpriseDashboardView applicants={applicants} stats={stats} selected={selected} navigateRole={navigateRole} refreshApplicants={refreshApplicants} />}
         {role === 'college' && <CollegeView applicants={applicants} stats={stats} />}
         {role === 'trainees' && (
           <OperationsView
@@ -1582,6 +1551,18 @@ function Metric({ icon: Icon, label, value, tone }: { icon: typeof Users; label:
       <Icon size={22} />
       <span>{label}</span>
       <strong>{value}</strong>
+    </article>
+  )
+}
+
+function SummaryStat({ icon: Icon, label, value, tone }: { icon: typeof Users; label: string; value: number | string; tone: 'blue' | 'amber' | 'teal' | 'green' | 'danger' }) {
+  return (
+    <article className={`summary-stat ${tone}`}>
+      <Icon size={18} />
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
     </article>
   )
 }
@@ -1767,9 +1748,10 @@ function HeatmapCard({ applicants }: { applicants: Applicant[] }) {
   )
 }
 
-function EnterpriseDashboardView({ applicants, stats, navigateRole, refreshApplicants }: {
+function EnterpriseDashboardView({ applicants, stats, selected, navigateRole, refreshApplicants }: {
   applicants: Applicant[]
   stats: { total: number; approved: number; pendingDocs: number; interviewed: number; scheduled: number; portalAttended: number; portalNoShows: number; directApplicants: number }
+  selected: Applicant
   navigateRole: (nextRole: Role) => void
   refreshApplicants: () => Promise<void>
 }) {
@@ -1836,11 +1818,17 @@ function EnterpriseDashboardView({ applicants, stats, navigateRole, refreshAppli
     summary: (
       <section className="dashboard-section" aria-label="ملخص تنفيذي">
         <div className="section-title"><h2>ملخص تنفيذي</h2><Sparkles size={21} /></div>
-        <div className="dashboard-kpis">
-          <Metric icon={Users} label="إجمالي المتقدمين" value={stats.total} tone="blue" />
-          <Metric icon={CalendarDays} label="جاهزية الجدولة" value={percent(stats.scheduled, stats.total)} tone="teal" />
-          <Metric icon={CheckCircle2} label="إنجاز المقابلات" value={percent(stats.interviewed, stats.total)} tone="green" />
-          <Metric icon={Clock3} label="لم يحضروا" value={stats.portalNoShows} tone="danger" />
+        <div className="summary-stats-grid">
+          <SummaryStat icon={Users} label="إجمالي المتقدمين" value={stats.total} tone="blue" />
+          <SummaryStat icon={FileCheck2} label="طلبات قيد المراجعة" value={stats.pendingDocs} tone="amber" />
+          <SummaryStat icon={CalendarDays} label="مواعيد مجدولة" value={stats.scheduled} tone="teal" />
+          <SummaryStat icon={CheckCircle2} label="نتائج معتمدة" value={stats.approved} tone="green" />
+          <SummaryStat icon={UserCheck} label="من البوابة وحضروا" value={stats.portalAttended} tone="green" />
+          <SummaryStat icon={Clock3} label="من البوابة ولم يحضروا" value={stats.portalNoShows} tone="danger" />
+          <SummaryStat icon={QrCode} label="مسجل مباشر" value={stats.directApplicants} tone="blue" />
+          <SummaryStat icon={Sparkles} label="جاهزية المقابلات" value={`${percent(stats.scheduled, stats.total)}%`} tone="teal" />
+          <SummaryStat icon={ListChecks} label="تحتاج متابعة" value={stats.pendingDocs} tone="amber" />
+          <SummaryStat icon={ShieldCheck} label="آخر ملف محدد" value={selected.requestNo} tone="blue" />
         </div>
       </section>
     ),
